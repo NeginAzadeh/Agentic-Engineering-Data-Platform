@@ -21,6 +21,7 @@ Engineering teams need reliable information about how work moves from pull reque
 - Four read-only agent data tools retrieve repository KPIs, bounded lists of observed stale open PRs with GitHub links, stored PR details, and data-quality/freshness status. Tool responses include observation timestamps, provenance, and limitations.
 - Provider-neutral function schemas and an allowlisted dispatcher validate arguments and reject arbitrary SQL, unknown tool names, and unexpected fields. The data tools use local DuckDB and make no API calls.
 - A fully local Ollama agent uses `qwen3:4b-instruct`, native function calling, bounded sequential tool rounds, and an interactive CLI. It uses existing `requests` and `AgentTools`, with no paid services, model SDK, API keys, or new packages.
+- A local evaluation framework wraps the unchanged Agent with 18 version-controlled natural-language cases, deterministic offline tests, separate tool/argument/evidence/behavior scores, conservative KPI-number checks, trace/timing capture, and JSON reports. Every generated answer still requires human review.
 - Archived weather proof of concept: fetch Turin hourly temperatures and load them into DuckDB without duplicate timestamps. The scripts in `archive/weather_poc/` still use the existing project-level data files.
 
 GitHub ingestion is a snapshot, not complete history. Page-limited snapshots are explicitly incomplete, and the warehouse preserves that status. Even when pagination is exhausted, PRs can change during extraction and this endpoint does not provide every historical PR event. The warehouse stores current observed PR values, not every change over time. KPIs describe this observed, potentially incomplete cohort; they are not full-repository performance statistics or developer productivity rankings. The local Agent retrieves these observations and answers with evidence; generated prose still needs checking against that evidence.
@@ -96,6 +97,17 @@ Natural repository comparisons do not need internal function names. The Ollama a
 
 See [the local Agent guide](docs/local_agent.md) for setup, loop architecture, security boundaries, limitations, and evaluation. Automated tests need no running Ollama. Real smoke tests used the installed Ollama 0.40.2/model and verified native tool selection, including a two-round list-then-inspect workflow. No commits or pushes are performed by the Agent.
 
+Evaluate the Agent using the existing local model and warehouse:
+
+```powershell
+.\.venv\Scripts\python.exe -m src.engineering_intelligence.evaluate_agent --list
+.\.venv\Scripts\python.exe -m src.engineering_intelligence.evaluate_agent --cases single-kpis compare-median stale-three specific-pr quality-one missing-repository missing-comparison unsupported-execution injected-fact
+```
+
+Omit `--cases` to run all 18 questions. Reports under `data/reports/agent_evaluation_*.json` retain every selected case, failure, tool result, recovery, and latency. Correct tool selection is measured separately from answer completion, and only recognized numerical claims are checked automatically. An operational pass is not a factual-accuracy score. See [the evaluation guide](docs/agent_evaluation.md) for scoring rules, actual local results, and the factual errors found during answer review. The existing Agent behavior and security controls are unchanged.
+
+The 2026-10-20 local baseline evaluated 12 distinct cases: 10 operational passes (8 without repair, 2 recovery-assisted) and 2 routing/behavior-policy failures. Inspection also found incorrect pagination and freshness statements in passing answers. These results measure workflow behavior; they do not establish full answer accuracy. All 147 automated tests passed, including 25 new offline evaluation tests.
+
 The analytics script needs an existing warehouse with both tables. A valid empty warehouse produces an empty report; a repository with a run but no PRs has zero counts and unavailable (`null`) rates/durations. Generation time labels the output file only; it never affects open ages. `data/reports/` is excluded from Git, and reporting does not call GitHub or change raw snapshots, ingestion code, or warehouse tables.
 
 Optional archived weather commands:
@@ -112,7 +124,7 @@ Fetching weather again overwrites its raw JSON; loading reuses the database. Git
 | Component | Intended purpose |
 | --- | --- |
 | Dashboard | Present engineering metrics and trends |
-| Expanded agent workflows | Broader evaluation and carefully scoped investigation features beyond the local read-only assistant |
+| Expanded agent workflows | Broader investigation features and expanded evaluation beyond the implemented local evaluation baseline |
 | GCP | Host cloud storage and pipeline workloads |
 | Airflow | Schedule and coordinate pipeline tasks |
 | dbt | Build documented and tested SQL transformations |
@@ -127,12 +139,13 @@ This is a learning roadmap, not an implemented production system. Exact cloud se
 ```text
 archive/weather_poc/          Preserved, runnable weather scripts
 src/engineering_intelligence/ Pipeline, KPI reporter, agent tools/schemas, and local Agent
+evaluations/                Version-controlled Agent questions and expected behavior
 sql/analytics/              Shared PR calculations and SQL report queries
-tests/                      Ingestion, warehouse, and analytics tests
-docs/                       Architecture, warehouse, and analytics guides
+tests/                      Pipeline, tools, Agent, and offline evaluation tests
+docs/                       Architecture, pipeline, Agent, and evaluation guides
 data/raw/                   Original API responses (ignored by Git)
 data/processed/             Engineering and weather databases (ignored by Git)
-data/reports/               Generated KPI JSON reports (ignored by Git)
+data/reports/               Generated KPI and evaluation JSON reports (ignored by Git)
 README.md                   Purpose, status, and run commands
 .gitignore                  Local files excluded from Git
 ```
