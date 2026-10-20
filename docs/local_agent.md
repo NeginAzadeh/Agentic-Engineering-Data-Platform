@@ -1,5 +1,33 @@
 # Fully local Ollama Agent
 
+The repeatable evaluation runner is documented in [Local Agent evaluation](agent_evaluation.md). It wraps this Agent without changing its prompts, tools, recovery rules, or security boundary. The guide records operational scores separately from factual problems found in generated answers; previous smoke-test successes below are not a certification of prose accuracy.
+
+## Targeted answer grounding
+
+The `feature/agent-answer-grounding` changes address factual errors recorded in that evaluation. The evaluation runner and dataset stay unchanged; the read-only tool evidence and Agent answer checks improve. The original baseline reports remain intact.
+
+| Claim | Supporting source and meaning |
+| --- | --- |
+| Successful pages fetched | Stored `ingestion_runs.pages_fetched`, now exposed for the latest and contributing runs; unknown remains unknown |
+| Pagination completeness | Stored `pagination_complete` plus `stop_reason`; contributing PR-run completeness can differ from the latest attempt |
+| Starting API URL | `source_start_url`, an explicit alias of retained `source_url`; a `page` parameter proves neither page count nor completeness |
+| Extraction and observation timestamps | Latest run's UTC extraction timestamp, earliest/latest PR observation timestamps, and per-PR observation timestamps |
+| Extraction freshness | Existing elapsed hours from extraction to the explicit UTC check time; Python divides by 24 for the displayed days |
+| Open PR age | Existing creation-to-extraction age; unaffected by today's clock |
+| Later GitHub events, review causes, or developer productivity | Unsupported by this evidence; staleness, counts, and author attribution do not establish these claims |
+
+`answer_grounding.py` formats critical metadata from returned scalar fields and provides narrow checks used by the existing final-answer validator. Python's evidence appendix includes each repository's observation range, latest extraction and check timestamps, pages fetched, completeness, stop reason, contributing-run metadata, freshness hours/days, and fixed interpretation limits. For example, a stored age of 245 hours is displayed as `245.00 hours (10.21 days)`. This is an illustrative conversion, not a hardcoded source age. Missing or future extraction ages remain unknown; no replacement timestamp is invented.
+
+Numerical freshness presentation is reserved for Python. The model-facing tool view explicitly omits numerical extraction ages, the per-result `stale_after_hours` threshold, check timestamps, and API starting URLs, while full validated results remain in `tool_calls` for evaluation and the deterministic appendix. Repository/PR links, extraction timestamps, KPIs, PR ages, page counts, and quality flags remain visible to the model. Generic tool-schema policy wording is not an observation of extraction age. This is a deliberate presentation contract, not silent truncation or evidence loss. Both the original result and projected view are subject to the existing tool-result size cap.
+
+If model prose contains a recognized numerical extraction-age statement, even a correct conversion, the validator requests a rewrite without those numbers. A correctly quoted configured freshness-policy threshold is allowed; it is distinct from actual extraction age. A lower-bound statement such as "older than the threshold" is also allowed only when its value/unit matches the configured threshold and the returned stale flag supports it. Metrics such as merge duration and PR age can still appear in model prose. Page-count and recognized completeness claims are checked against explicit returned metadata, including negated statements and false flags; neither a starting URL nor a page count proves the final page index. Recognized ISO extraction/observation timestamps are checked against returned timestamps, with explicit repository identifiers narrowing their scope.
+
+Additional guards target the observed positive claims that stale observations imply old/open PRs or later closure/merge, that PR counts/authorship enable productivity judgments, or that review/bottleneck causes are known. Safe disclaimers remain allowed. A fixed Python-rendered explanation always states the distinction between freshness and open age, and that developer productivity and review causes cannot be inferred.
+
+These checks use the existing shared recovery budget (maximum two) and tools-disabled answer rewrite. `answer_rejected` records every rejected draft and reason, including after the budget is exhausted. Rejected text is labelled `untrusted_draft` in the local trace/report for diagnosis; it is never replayed as an instruction in recovery. Repeated failures yield `answer_withheld`; the Agent never replaces a rejected draft with an invented answer or bypasses tools to run SQL/code. The four tools, validation, read-only DuckDB connections, and model/tool-round budgets remain unchanged.
+
+The guards are conservative pattern checks, not a semantic proof. Complex or unsupported phrasing, aliases instead of explicit repository names, Markdown layouts, quoted titles, and missing context can evade checks or cause a valid draft to be rejected. Numeric KPI claims, comparison reasoning, prose-only date formats, omitted context, and causal/productivity paraphrases still need human review. A correct deterministic appendix does not certify model prose. See [the follow-up evaluation record](agent_evaluation.md#answer-grounding-follow-up) for actual successes and failures.
+
 ## Setup and commands
 
 This milestone uses Windows 11, Python 3.12 in the existing `.venv`, Ollama 0.40.2, and the already-installed `qwen3:4b-instruct` tag. It requires the existing engineering DuckDB warehouse. No packages, frameworks, model downloads, API keys, billing accounts, or paid services are added.

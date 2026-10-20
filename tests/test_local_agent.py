@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 import requests
 
 from src.engineering_intelligence.agent_tools import AgentTools
+from src.engineering_intelligence.answer_grounding import model_tool_result
 from src.engineering_intelligence.local_agent import (
     AgentError, DEFAULT_MODEL, LocalAgent, MAX_CALLS_PER_ROUND,
     MAX_TOOL_RESULT_CHARS, OllamaChatClient, OLLAMA_CHAT_URL, SYSTEM_PROMPT,
@@ -73,7 +74,8 @@ class LocalAgentTests(unittest.TestCase):
         request = client.requests[1]
         self.assertEqual(request["messages"][-1]["role"], "tool")
         self.assertEqual(request["messages"][-1]["tool_name"], "get_repository_kpis")
-        self.assertEqual(json.loads(request["messages"][-1]["content"])["untrusted_tool_result"], tools.call_tool.return_value)
+        self.assertEqual(json.loads(request["messages"][-1]["content"])["untrusted_tool_result"], model_tool_result(tools.call_tool.return_value))
+        self.assertEqual(result["tool_calls"][0]["result"], tools.call_tool.return_value)
         self.assertEqual(client.requests[0]["tools"], ollama_tool_schemas())
         self.assertIn("median_time_to_merge_hours", client.requests[0]["tools"][0]["function"]["description"])
         self.assertIn("incomplete_pagination", result["answer"])

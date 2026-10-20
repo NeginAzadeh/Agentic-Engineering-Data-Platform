@@ -28,12 +28,13 @@ class AgentToolsTests(unittest.TestCase):
             create_tables(connection)
 
     def add_run(self, run_id="run-a", repository="example/repo", extracted_at="2026-10-10T00:00:00Z",
-                complete=False, error=None, rejected=0, issues=None):
+                complete=False, error=None, rejected=0, issues=None, pages_fetched=1,
+                source_url="https://api.github.com/repos/example/repo/pulls"):
         with duckdb.connect(str(self.database)) as connection:
             connection.execute("""
-                INSERT INTO ingestion_runs VALUES (?, ?, ?, NULL, 'https://api.github.com/repos/example/repo/pulls',
-                    'fixture.json', ?, 1, ?, ?, 0, 0, ?, ?)
-            """, [run_id, repository, extracted_at, complete,
+                INSERT INTO ingestion_runs VALUES (?, ?, ?, NULL, ?,
+                    'fixture.json', ?, ?, ?, ?, 0, 0, ?, ?)
+            """, [run_id, repository, extracted_at, source_url, complete, pages_fetched,
                   "exhausted" if complete else "page_limit", error, rejected, json.dumps(issues or [])])
 
     def add_pr(self, number=1, repository="example/repo", run_id="run-a", state="open",
@@ -286,6 +287,46 @@ class AgentToolsTests(unittest.TestCase):
         self.assertFalse(data["freshness"]["latest_extraction_is_stale"])
         self.assertEqual(data["freshness"]["stale_pr_observation_count"], 0)
         self.assertNotIn("stale_latest_extraction", data["warnings"])
+
+    def test_explicit_page_count_is_read_from_metadata_not_start_url(self):
+        start_url = "https://api.github.com/repos/example/repo/pulls?per_page=30&page=1"
+        self.add_run(pages_fetched=3, source_url=start_url)
+        self.add_pr()
+        for name, arguments in (
+            ("get_repository_kpis", {"repository": "example/repo"}),
+            ("get_data_quality_status", {"repository": "example/repo"}),
+            ("get_pr_details", {"repository": "example/repo", "pr_number": 1}),
+            ("list_stale_open_prs", {"repository": "example/repo", "min_age_days": 7, "limit": 1}),
+        ):
+            with self.subTest(tool=name):
+                quality = self.tools.call_tool(name, arguments)["evidence"]["data_quality"]
+                latest = quality["latest_ingestion_run"]
+                self.assertEqual(latest["pages_fetched"], 3)
+                self.assertEqual(latest["source_start_url"], start_url)
+                self.assertEqual(latest["source_url"], start_url)
+                self.assertFalse(latest["pagination_complete"])
+                self.assertEqual(latest["stop_reason"], "page_limit")
+                self.assertEqual(quality["observation_runs"][0]["pages_fetched"], 3)
+                self.assertEqual(quality["observation_runs"][0]["source_start_url"], start_url)
+
+    def test_unknown_page_count_is_not_derived_from_url_and_runs_stay_separate(self):
+        self.add_run("old", extracted_at="2026-10-01T00:00:00Z", pages_fetched=1)
+        self.add_run("run-a", pages_fetched=None, complete=None,
+                     source_url="https://api.github.com/repos/example/repo/pulls?page=99")
+        self.add_pr(run_id="old", extracted_at="2026-10-01T00:00:00Z")
+        quality = self.tools.get_data_quality_status("example/repo")["data"]
+        self.assertIsNone(quality["latest_ingestion_run"]["pages_fetched"])
+        self.assertIsNone(quality["latest_ingestion_run"]["pagination_complete"])
+        self.assertEqual(quality["observation_runs"][0]["pages_fetched"], 1)
+
+    def test_stale_observation_count_includes_closed_prs_and_is_not_open_age(self):
+        self.add_run()
+        self.add_pr(state="closed", merged_at="2026-10-01T04:00:00Z")
+        freshness = self.tools.get_data_quality_status("example/repo")["data"]["freshness"]
+        self.assertEqual(freshness["stale_pr_observation_count"], 1)
+        self.assertEqual(freshness["age_unit"], "hours")
+        self.assertEqual(self.tools.get_repository_kpis("example/repo")["data"]["metrics"]["open_prs"], 0)
+        self.assertIn("all PR states", freshness["meaning"])
 
 
 if __name__ == "__main__":
