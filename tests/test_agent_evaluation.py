@@ -103,6 +103,23 @@ class AgentEvaluationTests(unittest.TestCase):
         self.assertEqual(score["semantic_refusal"], "human_review")
         self.assertEqual(before, hashlib.sha256(self.database.read_bytes()).hexdigest())
 
+    def test_ok_with_valid_evidence_but_empty_model_answer_cannot_pass(self):
+        expected = self.case["expected_calls"][0]
+        evidence = self.tools.get_repository_kpis("example/repo")
+        references = [{**expected, "result": evidence}]
+        for answer in ("", " \n\t", "\n\nEvidence and limits: observed cohort; live GitHub status was not checked."):
+            with self.subTest(answer=answer):
+                result = {"status": "ok", "answer": answer, "tool_calls": [{
+                    "name": expected["tool"], "arguments": expected["arguments"], "result": evidence}]}
+                score = score_case(self.case, result, references, 1)
+                self.assertTrue(score["tool_selection_correct"])
+                self.assertTrue(score["arguments_correct"])
+                self.assertTrue(score["expected_evidence_retrieved"])
+                self.assertTrue(score["expected_behavior_matched"])
+                self.assertFalse(score["answer_completed"])
+                self.assertFalse(score["operational_pass"])
+                self.assertTrue(score["human_review_required"])
+
     def test_multiple_repository_calls_in_separate_rounds(self):
         case = deepcopy(self.case)
         case["question"] = "Compare example/repo and other/project observed counts."

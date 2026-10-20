@@ -244,8 +244,9 @@ def score_case(case, result, references, latency_seconds):
     explicit_recoveries = result.get("recoveries", 0)
     repaired = bool(explicit_recoveries or errors or any(event.get("event") in
                    ("recovery", "answer_recovery", "malformed_call", "tool_error") for event in trace))
-    operational_pass = tool_selection and arguments_correct and evidence_correct and behavior_correct and not any(
-        check["status"] == "mismatch" for check in numerical_checks)
+    operational_pass = (tool_selection and arguments_correct and evidence_correct and behavior_correct
+                        and (case["expected_behavior"] != "answer" or completed)
+                        and not any(check["status"] == "mismatch" for check in numerical_checks))
     return {
         "tool_selection_correct": tool_selection, "arguments_correct": arguments_correct,
         "expected_evidence_retrieved": evidence_correct, "operations": operations,
