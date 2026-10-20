@@ -155,3 +155,98 @@ Original reports are local and ignored:
 After conservative numeric-parser hardening, saved results were replayed through the final scorer without new model calls. No existing numerical-check or operational outcomes changed. The review artifact identifies source reports and the scorer hash; the original reports retain their original hashes and traces. Both live runs recorded identical warehouse hashes before/after (`08a3517b…`); no raw data was modified.
 
 Validation: **147 automated tests passed**, including **25 new offline evaluation tests**. They cover dataset validation, multiple-tool workflows, argument errors, recovery/no-call responses, empty results, expected local absence, error handling, numerical units/rounding/attribution, untrusted titles, metadata preservation, and JSON report output. Mocked model behavior proves the harness can observe these situations; it does not prove a real model will always behave the same way. Six dataset cases were not run live in this baseline.
+
+## Answer grounding follow-up
+
+The `feature/agent-answer-grounding` milestone preserves the original baseline above and its three report artifacts unchanged. The evaluation runner, dataset, KPI formulas, and warehouse contents are unchanged. Read-only tools now expose successful page counts and explicitly named starting URLs, and the Agent adds deterministic metadata presentation plus narrow answer checks. See [the implementation and field meanings](local_agent.md#targeted-answer-grounding).
+
+Three development iterations ran the same six existing natural questions on local Ollama 0.40.2 / `qwen3:4b-instruct`: `single-kpis`, `compare-median`, `quality-one`, `quality-two`, `unsupported-ranking`, and `unsupported-cause`. These are six distinct questions repeated after concrete code changes, not 18 independent reliability samples. No failure report was replaced by a successful rerun.
+
+| Development iteration | Operational passes | Without repair / recovery-assisted passes | Failures and findings |
+| --- | --- | --- | --- |
+| Explicit metadata and strict initial guards | 2/6 | 0 / 2 | Four answers withheld after numerical-freshness or unsupported-URL rejections |
+| Explicit model view; valid threshold quotations allowed | 4/6 | 1 / 3 | Both quality cases withheld; recorded drafts exposed false positives for negated completeness and valid stale-threshold lower bounds |
+| Corrected negation, repository scope, and stale-threshold bounds | 6/6 | 4 / 2 | No operational failures, but prose inspection found further unsupported claims and timestamp placeholders |
+
+All three iterations selected the expected tools and full arguments and retrieved reference-matching evidence for all six cases. The last six-case batch used 8 tool calls, 3 recoveries, 101.10 seconds total Agent time, and a 17.39-second median. Four requested labelled KPI claims matched warehouse values. These are operational and narrow numeric checks, not full-prose accuracy results.
+
+The first two reports deliberately retain unsuccessful outcomes. They also document the cost of overly broad guards: a correct statement such as "older than the configured threshold" or "did not complete pagination" must not be mistaken for a fabricated extraction age or an assertion of complete pagination. Regression tests now distinguish these, including false flags, unknown metadata, slash-separated PR state labels, and stale versus fresh source flags.
+
+The third iteration's accepted answers correctly reported three fetched pages and incomplete pagination. Critical hours-to-days conversions were Python-rendered rather than generated prose. Inspection nevertheless found issues automatic KPI scoring did not catch:
+
+- `single-kpis` and `unsupported-cause` generalized a zero count of **open** PRs older than seven days into "no PRs older than seven days." Closed/merged PR ages were not covered by that metric. The single-repository answer also inferred lifecycle activity from aggregate open ages; those aggregates alone do not establish that interpretation.
+- `compare-median` gave the correct medians and winner, but claimed equal cohort size and nearby extraction instants ensured a fair comparison. Neither establishes representativeness or comparability. It also used an invented placeholder ISO time, `2026-10-10T14:30:XXZ`.
+- `quality-one` correctly reported stored page and quality metadata, but said stale PR observations meant the PR states were "no longer current." Staleness cannot establish that states actually changed.
+- `quality-two` qualified its answer but began with broad reassurance that completeness/freshness could be trusted. That framing needs review against the actual incomplete/stale flags.
+- `unsupported-ranking` declined a ranking but emphasized missing author breakdowns rather than explaining why counts would remain insufficient even if authorship were available. Python's appended policy states the stronger limitation; the model's reasoning still requires review.
+
+The placeholder ISO timestamp and the specific "stale observations imply no-longer-current states" pattern prompted two additional guards and regressions, followed by a separate targeted retest of `compare-median` and `quality-one`. A correct metadata appendix is not used as proof that other model prose is accurate. Qualitative comparisons, cohort fairness, metric scope, productivity rationale, unrecognized event/causal paraphrases, and non-ISO prose dates remain review responsibilities.
+
+Retained development reports under ignored `data/reports/`:
+
+- `agent_evaluation_20261020T205949638121Z.json`: 2/6 operational passes; four withheld answers.
+- `agent_evaluation_20261020T210435340239Z.json`: 4/6 operational passes; two withheld answers.
+- `agent_evaluation_20261020T210828598128Z.json`: 6/6 operational passes; residual prose issues listed above.
+- `agent_evaluation_20261020T211103817733Z.json`: final stricter two-case retest, **1/2 operational passes**. The median comparison corrected its placeholder timestamp after one rewrite and retained the correct metric values. The quality answer was withheld after two rewrites: the new stale-state guard rejected its original claim, and subsequent drafts used the ambiguous phrase "24 hours after extraction" instead of leaving numerical ages to Python. This completion failure remains unresolved; the deterministic metadata appendix is still available.
+
+The final targeted retest selected the correct tools/arguments and retrieved matching evidence for both cases, used 3 tool calls and 3 recoveries, and took 66.00 seconds. Its comparison used repository aliases in narrative form, so both requested numerical checks were marked for human review rather than automatically verified, despite inspection finding the two median values correct. Its word "significantly" should not be interpreted as statistical significance; no significance test was performed.
+
+These four runs contain 20 question attempts across six distinct questions. The 6/6 batch preceded the final timestamp/stale-state guards; it must not be presented as a 100% pass rate for the final implementation. The final targeted outcome is one completed answer and one safe withholding. All report artifacts, including unsuccessful development iterations, remain local and ignored. A separate `agent_answer_grounding_review_*.json` artifact records Codex-assisted findings, current source hashes, and before/after hashes confirming that the warehouse, raw JSON, and original baseline reports stayed unchanged. Human review is still required.
+
+The final automated suite passed **169 tests**, including **21 new regressions** relative to the 148-test starting point. The full validated tool results remain in evaluation records even though the explicitly labelled model-facing view omits Python-owned numerical freshness values, check timestamps, and API starting URLs. The evaluator still excludes Python's metadata appendix from model-generated numerical scoring and still flags every answer for human review.
+
+## Focused reliability review (2026-10-21)
+
+This review inspected the exact `quality-one` failure in `agent_evaluation_20261020T211103817733Z.json`, including all three rejected drafts, original tool results, and trace reasons. It made one small presentation change and ran the unchanged two-case and six-case sets once each. No additional Agent rewrite or guard relaxation was attempted.
+
+The original failure was not simply a false-positive rejection:
+
+- Request 2 claimed that 90 stale PR observations meant PRs had states that were "no longer current." No post-extraction events were observed. The stale-state guard correctly rejected that unsupported inference.
+- Requests 3 and 4 said "stale (24 hours after extraction)." The stored policy threshold was 24 hours, but the actual checked-at age was approximately **246.67 hours**. This wording could describe the threshold; it could also be read as an actual age. It was ambiguous rather than an unambiguously supported age statement. The guard's conservative rejection was retained; the numeric value alone did not justify accepting the drafts.
+- Request 4 additionally described the run as having "completed at" `2026-10-10T14:30:38.914233Z`. That is the extraction start timestamp. Read-only warehouse inspection showed `finished_at = 2026-10-10T14:30:42.124217Z`. The original tool response exposed extraction time, not completion time. This role error was separate from the logged freshness rejection and remains an example requiring prose review.
+
+The only behavioral change is to omit the per-result `stale_after_hours` field from the existing model-facing projection, alongside the numerical extraction ages already omitted. The system description and projection notice now describe this consistently. Full tool results, reference evidence, and deterministic output still retain the configured threshold and actual age. Generic policy wording in schemas is not evidence of a specific extraction age. This removes one numerical field the model was confusing with age without changing any guard, SQL, tool allowlist, input validation, size limit, recovery budget, question, or expected behavior.
+
+Python's existing appendix remains responsible for separately displaying the policy threshold, checked-at time, actual hours/days, and recorded pagination facts. The change does not replace an empty or rejected model answer with application prose, and the nonempty-model-answer requirement for operational success remains intact.
+
+Three new deterministic tests cover the presentation contract, exact recorded freshness paragraphs with the original two-recovery exhaustion, and separate negative controls for false ages/conversions, page counts/completeness, and state-change claims. The old bad paragraphs still produce `answer_withheld`. The new model-view test failed before the field omission and passed afterward. The complete offline suite passed **172 tests**.
+
+The two-case retest (`compare-median`, `quality-one`) achieved **2/2 operational passes**, **0 withheld answers**, and **2 recovery attempts**: the comparison passed without repair, while the quality answer needed both corrections. Tool selection, arguments, and evidence retrieval passed for both. The quality drafts invented an age of **90 hours**, apparently confusing the stale-observation count with duration; both drafts were correctly rejected. The accepted quality answer removed numerical ages, reported the stored 3-page/incomplete metadata, and preserved the distinction between stale observations and current GitHub state. This demonstrates why the guards remain necessary even after reducing the model-facing numerical metadata.
+
+The comparison used correct median values, but its "Same extraction timestamp" heading and "single point in time" framing remain misleading: the repositories' extraction instants differ by about 3.8 seconds. The deterministic appendix gives both exact instants. This prose issue was not automatically rejected, so the operational pass is not a full factual-accuracy pass. No new semantic check was added to chase this finding.
+
+The same six-case set then ran once with the same code, questions, expectations, and budgets. Results are separate from prose findings:
+
+| Measure | Same two targeted questions | Same six-case set |
+| --- | --- | --- |
+| Operational passes | 2/2 | 6/6 |
+| Answer withheld | 0 | 0 |
+| Passes without recovery | 1 | 3 |
+| Recovery-assisted passes | 1 | 3 |
+| Recovery attempts | 2 | 6 |
+| Tool calls | 3 | 8 |
+| Tool/argument/evidence checks | All passed | All passed |
+| Recognized KPI numerical checks | 2 verified | 4 verified |
+| Agent execution time | 58.64 seconds | 122.42 seconds |
+
+Six-case recovery details: `single-kpis`, `compare-median`, and `quality-two` completed without recovery. `quality-one`, `unsupported-ranking`, and `unsupported-cause` each used two attempts. For ranking and cause questions, one attempt gathered initially missing evidence and one corrected an answer; the quality case used two answer corrections. All answers remain marked for human review. The two targeted cases repeat in the six-case set, so these are not eight independent samples.
+
+Further inspection found unresolved problems in accepted prose:
+
+- **Definite unit error:** `quality-two` described "90 PR observations (measured in hours)." Ninety is a count across PR states, not a duration. The numerical-age pattern did not recognize this wording, and the existing evaluator does not score it as a KPI numeric claim. Correct Python metadata does not erase this model error.
+- **Evidence-scope overclaim:** `unsupported-cause` said "no PRs older than 7 days" although the supporting KPI covers only open PRs. An independent read-only check found that all 90 observed Airflow PRs actually were created within seven days of extraction (maximum about 2.40 days), so this is an unjustified generalization from the retrieved metric, not a demonstrated wrong value. It did decline to infer review causes.
+- **Unsupported interpretation:** `single-kpis` suggested open PR counts could indicate review bottlenecks; review events were not measured. Its separate statement that most open PRs were under two days is supported here: the median is about 1.16 days with 63 non-null open ages, and an independent warehouse check found 50/63 under two days. This statement is not counted as a factual error in this review.
+- **Misleading timestamps:** the comparison repeated the "Same extraction timestamp" heading despite differing source instants and its own "nearly the same time" qualification.
+- **Refusal rationale requiring review:** the ranking answer declined to rank but focused on unavailable author/contribution details. Author attribution would still not establish productivity; the fixed Python limitation states this explicitly.
+
+Guard reasons are also not factual-error labels. In the six-case run, the cause draft's sentence combined a supported open-PR-age metric with a stale-data warning; the broad numerical-freshness check treated that age as extraction age. The same draft separately made unsupported "slow" and high-closed-without-merge interpretations, but those were not the logged rejection reason. The productivity guard also rejected a sentence saying rankings were unsupported without attribution/counts; that wording does not itself assert counts would be sufficient. These are conservative/overbroad pattern rejections, not proof that every rejected draft was wholly false. The guards were not relaxed or rewritten during this review.
+
+Preserved new reports (filenames use UTC):
+
+- `data/reports/agent_evaluation_20261020T220637213004Z.json`: unchanged two-question retest, 2/2 operational passes.
+- `data/reports/agent_evaluation_20261020T220919812941Z.json`: unchanged six-case set, 6/6 operational passes.
+- `data/reports/agent_grounding_reliability_review_*.json`: forensic classifications, accepted-prose concerns, independent warehouse metadata, current source hashes, and integrity checks for all pre-existing data/report artifacts.
+
+This review stops after the one presentation correction and required evaluations. The sampled quality question now completes with the original fail-closed checks, but robust semantic grounding is still incomplete. The count/unit error, timestamp wording, metric-scope errors, and broader interpretations remain documented limitations rather than targets for another Agent rewrite here. No full-answer accuracy percentage is reported.
+
+The independent checks also clarify earlier review language about open-age scope: a claim can happen to be true in the warehouse while exceeding the evidence retrieved by the Agent. Conversely, a supported median-based age statement should not be labelled a factual error merely because a mean alone would not establish it. Historical evaluation reports remain unchanged.

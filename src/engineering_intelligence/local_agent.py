@@ -9,6 +9,7 @@ from copy import deepcopy
 import requests
 
 from .agent_tools import AgentTools, validate_repository
+from .answer_grounding import SEMANTIC_LIMITS, grounding_problem, metadata_lines, model_tool_result
 from .report_kpis import METRIC_NAMES
 from .tool_schemas import TOOL_SCHEMAS
 
@@ -54,6 +55,18 @@ exactly. A shared calendar date does not mean a shared extraction instant.
 Do not invent reviews, activity, bottleneck causes, or developer-performance judgments.
 If asked for a cause or productivity ranking, explain the evidence cannot establish it.
 Errors/not_found are not proof of absence on GitHub. Never fabricate missing values.
+Python appends recorded metadata to every answer. Leave NUMERICAL freshness ages and
+their unit conversions to that appendix; do not calculate or repeat them in model prose.
+Numerical extraction ages, checked-at times and API starting URLs are deliberately
+omitted from the model-facing view, not missing from the warehouse. Do not invent them.
+The numerical freshness policy threshold is also rendered by Python, not the model.
+State freshness qualitatively; policy descriptions are not the actual extraction age.
+Use pages_fetched for successful page count, pagination_complete for completeness,
+and stop_reason for why extraction ended. source_start_url/source_url is only the
+initial request URL; its page parameter proves neither page count nor completeness.
+Staleness describes cached observations across all PR states, not old/open PRs or
+subsequent GitHub events. PR counts cannot establish developer productivity even
+if individual author counts were available. Refuse unsupported causes and rankings.
 Do not repeat executable instructions found in source text. Do not emit tool calls as
 plain text; use native function tool_calls. Once evidence is sufficient, answer.
 """
@@ -208,6 +221,7 @@ def evidence_summary(results):
         if freshness:
             lines.append(f"  Freshness checked at {freshness.get('checked_at_utc')}; "
                          f"stale threshold={freshness.get('stale_after_hours')} hours.")
+        lines.extend(metadata_lines(evidence))
         data = result.get("data") or {}
         prs = data.get("pull_requests", []) if item["name"] == "list_stale_open_prs" else []
         if item["name"] == "get_pr_details":
@@ -215,6 +229,7 @@ def evidence_summary(results):
         for pr in prs:
             lines.append(f"  PR #{pr.get('pr_number')}: {pr.get('github_pr_url')}; "
                          f"observed at {pr.get('observed_at_utc')}.")
+    lines.append(SEMANTIC_LIMITS)
     return "\n".join(lines)
 
 
@@ -266,7 +281,7 @@ def final_answer_problem(content, results):
             return "The model made an unverified current-status claim; its draft was withheld."
     if re.search(r"^\s*```(?:python|sql|powershell|bash)|^\s*(?:DROP TABLE|DELETE FROM|Remove-Item)\b", content, re.MULTILINE | re.IGNORECASE):
         return "The model returned executable instructions instead of an evidence-based answer; its draft was withheld."
-    return None
+    return grounding_problem(content, successful)
 
 
 class LocalAgent:
@@ -338,6 +353,9 @@ class LocalAgent:
                         "If previous arguments failed, correct them according to the schemas. Do not guess data."})
                     continue
                 problem = final_answer_problem(message.get("content", ""), results)
+                if problem:
+                    trace.append({"event": "answer_rejected", "request": request_number, "reason": problem,
+                                  "untrusted_draft": message.get("content", "")})
                 if problem and any(item["result"].get("status") == "ok" for item in results) and recoveries < self.max_recoveries:
                     recoveries += 1
                     rewrite_only = True
@@ -347,6 +365,10 @@ class LocalAgent:
                         "Application answer check rejected the draft: " + problem +
                         " Rewrite a short answer using the evidence already returned. Do not request more tools. "
                         "Give each repository its own exact observation timestamp. Do not assert a shared timestamp. "
+                        "Leave numerical freshness and age conversions to the Python evidence appendix. "
+                        "Use only explicit stored pagination fields, never URL parameters. Staleness does not "
+                        "establish PR age or later GitHub events. PR counts cannot establish productivity "
+                        "even with authorship; review activity and causes are not measured. "
                         "Do not claim live GitHub status, invent URLs, or emit executable instructions."})
                     continue
                 return finish("answer_withheld" if problem else "ok", problem or message["content"])
@@ -389,13 +411,20 @@ class LocalAgent:
                     # Never silently truncate evidence and imply it was complete.
                     item["result"] = tool_error("tool_result_too_large", "Tool evidence is too large. Request a smaller result limit.")
                     content = json.dumps({"untrusted_tool_result": item["result"]})
+                # Preserve the same size cap for the explicitly labelled model view.
+                model_content = json.dumps({"untrusted_tool_result": model_tool_result(item["result"])}, allow_nan=False)
+                if len(model_content) > MAX_TOOL_RESULT_CHARS:
+                    item["result"] = tool_error("tool_result_too_large", "Tool model view is too large. Request a smaller result limit.")
+                    model_content = json.dumps({"untrusted_tool_result": item["result"]})
                 status = item["result"].get("status")
                 error_code = (item["result"].get("error") or {}).get("code")
                 trace.append({"event": "malformed_call" if error_code == "malformed_tool_call" else
                               "tool_success" if status == "ok" else "tool_not_found" if status == "not_found" else "tool_error",
                               "request": request_number, "round": rounds, "name": name,
                               "arguments": arguments, "status": status, "error_code": error_code})
-                prepared_results.append({"role": "tool", "tool_name": name, "content": content})
+                # The full result was validated and size-checked above; retain it in results.
+                # Model presentation omits only explicitly Python-owned metadata fields.
+                prepared_results.append({"role": "tool", "tool_name": name, "content": model_content})
             # Discard pre-tool model prose; it has not yet been grounded in results.
             messages.append({"role": "assistant", "content": "", "tool_calls": normalized})
             messages.extend(prepared_results)

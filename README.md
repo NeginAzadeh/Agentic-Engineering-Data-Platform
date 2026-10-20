@@ -108,6 +108,10 @@ Omit `--cases` to run all 18 questions. Reports under `data/reports/agent_evalua
 
 The 2026-10-20 local baseline evaluated 12 distinct cases: 10 operational passes (8 without repair, 2 recovery-assisted) and 2 routing/behavior-policy failures. Inspection also found incorrect pagination and freshness statements in passing answers. These results measure workflow behavior; they do not establish full answer accuracy. All 147 automated tests passed, including 25 new offline evaluation tests.
 
+The subsequent [answer-grounding changes](docs/local_agent.md#targeted-answer-grounding) expose stored page counts and starting-URL semantics, render freshness hours/days in Python, and reject recognized unsupported metadata, staleness, causal, or productivity claims through the existing bounded rewrite mechanism. The original evaluation baseline is preserved; [follow-up results](docs/agent_evaluation.md#answer-grounding-follow-up) distinguish operational checks from prose review.
+
+Before the focused reliability review, the suite passed 169 tests and the targeted local retest completed the median comparison but withheld the quality answer. The current suite passes 172 tests. After one presentation correction, the unchanged two-question retest passed 2/2 operational checks and the unchanged six-case set passed 6/6, with 2 and 6 recovery attempts respectively and no withheld answers. Prose inspection still found count/unit confusion, misleading timestamp wording, and metric-scope errors. These are operational results, not full factual accuracy; see the [focused review and limitations](docs/agent_evaluation.md#focused-reliability-review-2026-10-21).
+
 The analytics script needs an existing warehouse with both tables. A valid empty warehouse produces an empty report; a repository with a run but no PRs has zero counts and unavailable (`null`) rates/durations. Generation time labels the output file only; it never affects open ages. `data/reports/` is excluded from Git, and reporting does not call GitHub or change raw snapshots, ingestion code, or warehouse tables.
 
 Optional archived weather commands:

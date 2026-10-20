@@ -84,7 +84,7 @@ class AgentTools:
         source_runs = rows(connection, """
             SELECT r.run_id,
                 strftime(r.extracted_at, '%Y-%m-%dT%H:%M:%S.%fZ') AS extracted_at_utc,
-                r.source_url, r.snapshot_file, r.pagination_complete,
+                r.source_url, r.snapshot_file, r.pages_fetched, r.stop_reason, r.pagination_complete,
                 r.source_error, r.rejected_records, r.quality_issues
             FROM ingestion_runs AS r
             WHERE r.repository = ? AND (r.run_id = ? OR EXISTS (
@@ -95,6 +95,7 @@ class AgentTools:
         """, [repository, context["latest_run_id"]])
         for run in source_runs:
             run["quality_issues"] = json.loads(run["quality_issues"] or "[]")
+            run["source_start_url"] = run["source_url"]
         observation_ids = set(context["observation_run_ids"] or [])
         observation_runs = [run for run in source_runs if run["run_id"] in observation_ids]
         latest_source = next((run for run in source_runs if run["run_id"] == context["latest_run_id"]), {})
@@ -143,23 +144,28 @@ class AgentTools:
                 "oldest_pr_observation_age_hours": oldest_age,
                 "newest_pr_observation_age_hours": newest_age,
                 "stale_pr_observation_count": stale_count,
+                "age_unit": "hours",
+                "meaning": "Time since extraction, not PR open age or evidence of later GitHub events; stale count includes all PR states.",
             },
             "latest_ingestion_run": {
                 "run_id": context["latest_run_id"],
                 "extracted_at_utc": context["latest_run_extracted_at_utc"],
                 "pagination_complete": latest_complete,
+                "pages_fetched": latest_source.get("pages_fetched"),
                 "stop_reason": context["latest_run_stop_reason"],
                 "source_error": context["latest_run_source_error"],
                 "accepted_records": context["latest_run_accepted_records"],
                 "rejected_records": context["latest_run_rejected_records"],
                 "quality_issues": quality_issues,
                 "source_url": latest_source.get("source_url"),
+                "source_start_url": latest_source.get("source_start_url"),
                 "snapshot_file": latest_source.get("snapshot_file"),
             },
             "observation_runs": observation_runs,
             "all_observation_runs_pagination_complete": observed_complete,
             "prs_from_runs_with_source_errors": context["prs_from_runs_with_source_errors"],
             "warnings": warning_codes,
+            "pagination_meaning": "pages_fetched is the stored count of successful API pages for that run; null means unknown. source_start_url (also source_url for compatibility) is the initial request URL, not proof of pages fetched or completeness. pagination_complete and stop_reason are separate stored fields.",
         }
 
     def _perform(self, tool, repository, operation):
