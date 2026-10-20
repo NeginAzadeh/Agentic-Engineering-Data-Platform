@@ -110,13 +110,16 @@ Airflow would coordinate tasks; Docker would package their runtime. GCP would ho
 
 ## Folder responsibilities
 
+The implemented evaluation layer sits outside the Agent: version-controlled `evaluations/agent_cases.json` -> `evaluate_agent.py` -> unchanged `LocalAgent.ask` -> operational/numerical checks -> ignored JSON report and human review. Expected operations and independent warehouse reference reads never enter model messages. See [the evaluation methodology and actual results](agent_evaluation.md).
+
 - `src/engineering_intelligence/`: pipeline, reports, agent tools/schemas, and local Ollama loop/CLI.
 - `sql/analytics/`: PR calculations and repository KPI queries.
 - `tests/`: mocked API tests and isolated DuckDB warehouse/analytics tests.
+- `evaluations/`: natural-language questions, expected tools/arguments, and review criteria.
 - `archive/weather_poc/`: preserved and runnable learning example.
 - `data/raw/`: original API responses.
 - `data/processed/`: local engineering and weather databases.
-- `data/reports/`: generated KPI JSON, excluded from version control.
+- `data/reports/`: generated KPI and Agent evaluation JSON, excluded from version control.
 - `docs/`: design documentation.
 
 Data and `.venv/` remain local through `.gitignore`. Ingestion, quality checks, warehouse, KPIs, agent tools, and local Ollama integration are implemented. dbt, dashboards, scheduling, cloud infrastructure, and broader Agent workflows remain planned.
