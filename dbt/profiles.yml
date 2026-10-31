@@ -1,0 +1,15 @@
+# No secrets. Set ENGINEERING_PROJECT_ROOT to the absolute project directory.
+engineering_intelligence:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('ENGINEERING_PROJECT_ROOT') }}/data/processed/engineering_dbt.duckdb"
+      schema: analytics
+      threads: 1
+      settings:
+        TimeZone: UTC
+      attach:
+        - path: "{{ env_var('ENGINEERING_PROJECT_ROOT') }}/data/processed/engineering.duckdb"
+          alias: engineering_source
+          read_only: true

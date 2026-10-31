@@ -51,14 +51,23 @@ Both scripts locate the project root with `Path(__file__).resolve().parents[2]`,
 
 Both latest ingestion context and contributing observation-run context are retained. Older PRs can remain after later bounded or failed extractions, so this is an observed cohort with potentially mixed extraction times, not a complete or simultaneous view of repository activity. See [the analytics guide](analytics.md) for definitions and SQL learning examples.
 
-## Planned downstream pipeline (not implemented)
+## Implemented dbt transformations
+
+The local project in `dbt/` attaches the engineering warehouse read-only and writes
+views and tables to the separate `data/processed/engineering_dbt.duckdb`. Two
+staging models feed a PR lifecycle model, then a PR fact and repository KPI mart.
+`source()` and `ref()` define the DAG. dbt data tests check analytical contracts;
+an independent Python check compares the mart against the unchanged SQL analytics.
+Existing Agent tools and reporters continue reading their original source. See
+[the dbt guide](dbt_transformations.md) for lineage, grains, commands, and results.
+
+## Planned downstream consumers (not implemented)
 
 The read-only local Ollama Agent is implemented separately from its data tools; see below. Broader investigation workflows and dashboards remain planned.
 
 ```text
-Existing warehouse and SQL KPI report
-  -> dbt-managed transformations
-  -> Dashboard and expanded Agent workflows
+Existing warehouse -> implemented dbt transformations
+  -> planned Dashboard and expanded Agent workflows
 ```
 
 The dashboard would present defined metrics. Expanded agent workflows would require more evaluation and evidence sources. No dashboard is implemented; the current local assistant only calls the four existing tools.

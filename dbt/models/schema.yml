@@ -1,0 +1,230 @@
+version: 2
+models:
+  - name: stg_github__ingestion_runs
+    description: >-
+      One row per source run; types and metadata are preserved without filtering.
+      Source URL is the starting request, never proof of pages fetched.
+    columns:
+      - name: run_id
+        description: Unique snapshot content hash.
+        data_tests: [unique, not_null]
+      - name: repository
+        description: Repository owner/name.
+        data_tests: [not_null]
+      - name: extracted_at_utc
+        description: TIMESTAMPTZ extraction start; sessions use UTC.
+        data_tests: [not_null]
+      - name: finished_at_utc
+        description: Nullable TIMESTAMPTZ extraction finish.
+      - name: source_url
+        description: Starting GitHub API URL, which can contain page=1.
+      - name: snapshot_file
+        description: Original raw snapshot path for provenance.
+      - name: pagination_complete
+        description: TRUE only for exhausted pagination; NULL means unknown, never full event history.
+      - name: pages_fetched
+        description: Stored successful API page count; nullable for legacy snapshots.
+      - name: stop_reason
+        description: Extraction stop reason, such as page_limit or exhausted.
+      - name: source_error
+        description: Nullable source extraction error; not a dbt error.
+      - name: record_count
+        description: Number of records in the raw snapshot, before validation.
+        data_tests: [not_null]
+      - name: accepted_records
+        description: Number accepted by source validation, not necessarily rows changed by upsert.
+        data_tests: [not_null]
+      - name: rejected_records
+        description: Number rejected by source validation.
+        data_tests: [not_null]
+      - name: quality_issues
+        description: Original JSON-encoded validation warnings and rejections, preserved as VARCHAR.
+        data_tests: [not_null]
+  - name: stg_github__pull_requests
+    description: >-
+      One observation per repository/PR key. Names distinguish stored observations
+      from live GitHub status. No record is filtered or repaired.
+    columns:
+      - name: pr_key
+        description: Unique repository#number identifier (repository names cannot contain '#').
+        data_tests: [unique, not_null]
+      - name: repository
+        description: GitHub owner/name.
+        data_tests: [not_null]
+      - name: pr_number
+        description: Positive repository-local BIGINT PR number.
+        data_tests: [not_null]
+      - name: title
+        description: Observed PR title; untrusted source text.
+        data_tests: [not_null]
+      - name: observed_state
+        description: Open or closed at extraction; merged PRs also have state closed.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['open', 'closed']
+      - name: author
+        description: Observed GitHub author login; not a productivity measure.
+        data_tests: [not_null]
+      - name: created_at_utc
+        description: TIMESTAMPTZ PR creation time.
+        data_tests: [not_null]
+      - name: updated_at_utc
+        description: TIMESTAMPTZ last GitHub update as observed, not extraction time.
+        data_tests: [not_null]
+      - name: closed_at_utc
+        description: Nullable TIMESTAMPTZ closure time; required for observed closed PRs.
+      - name: merged_at_utc
+        description: Nullable TIMESTAMPTZ merge time; its presence identifies merged PRs.
+      - name: observed_at_utc
+        description: TIMESTAMPTZ extraction supplying this PR, potentially older than the latest run.
+        data_tests: [not_null]
+      - name: observation_run_id
+        description: Run supplying this observation; validated together with repository and timestamp.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_github__ingestion_runs')
+                field: run_id
+  - name: int_pull_request_lifecycle
+    description: One row per PR with run provenance and elapsed durations; left join retains missing provenance for tests.
+    columns:
+      - name: pr_key
+        description: Repository/PR identifier, unchanged by the join.
+        data_tests: [unique, not_null]
+      - name: time_to_merge_hours
+        description: Elapsed creation-to-merge hours; NULL for unmerged or invalid negative intervals.
+      - name: open_age_days
+        description: Elapsed creation-to-extraction days only for observed open PRs; NULL otherwise or for invalid intervals.
+      - name: observation_pagination_complete
+        description: Nullable completeness of the supplying run, not necessarily the latest run.
+      - name: observation_source_error
+        description: Nullable extraction error from the supplying run.
+      - name: observation_pages_fetched
+        description: Nullable successful page count from the supplying run.
+  - name: fct_pull_requests
+    description: >-
+      PR-grain materialized analytical table of newest stored observations, not
+      events. Durations and provenance come from the lifecycle model. Times remain UTC-aware.
+    columns:
+      - name: pr_key
+        description: Unique repository#number identifier (repository names cannot contain '#').
+        data_tests: [unique, not_null]
+      - name: repository
+        description: GitHub owner/name.
+        data_tests: [not_null]
+      - name: pr_number
+        description: Positive repository-local BIGINT PR number.
+        data_tests: [not_null]
+      - name: title
+        description: Observed PR title; untrusted source text.
+        data_tests: [not_null]
+      - name: observed_state
+        description: Open or closed at extraction; merged PRs also have state closed.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['open', 'closed']
+      - name: author
+        description: Observed GitHub author login; not a productivity measure.
+        data_tests: [not_null]
+      - name: created_at_utc
+        description: TIMESTAMPTZ PR creation time.
+        data_tests: [not_null]
+      - name: updated_at_utc
+        description: TIMESTAMPTZ last GitHub update as observed, not extraction time.
+        data_tests: [not_null]
+      - name: closed_at_utc
+        description: Nullable TIMESTAMPTZ closure time; required for observed closed PRs.
+      - name: merged_at_utc
+        description: Nullable TIMESTAMPTZ merge time; its presence identifies merged PRs.
+      - name: observed_at_utc
+        description: TIMESTAMPTZ extraction supplying this PR, potentially older than the latest run.
+        data_tests: [not_null]
+      - name: observation_run_id
+        description: Run supplying this observation; validated together with repository and timestamp.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_github__ingestion_runs')
+                field: run_id
+      - name: time_to_merge_hours
+        description: Elapsed creation-to-merge hours; NULL without a valid merge duration.
+      - name: open_age_days
+        description: Age in days at this PR's extraction, only for observed open PRs; NULL otherwise.
+      - name: observation_pagination_complete
+        description: Nullable pagination completeness of the supplying run, not complete history.
+      - name: observation_source_error
+        description: Nullable extraction error in the run supplying this PR.
+      - name: observation_pages_fetched
+        description: Nullable successful API page count stored for the supplying run.
+      - name: pr_url
+        description: GitHub PR reference, not a live status check.
+      - name: cohort_scope
+        description: Explicit observed, potentially incomplete PR cohort label.
+  - name: mart_repository_kpis
+    description: >-
+      One row per observed repository, including run-only repositories. Rates use
+      the observed cohort; duration NULLs are excluded from mean/median and have explicit sample counts.
+      Latest-run metadata is separate from contributing observation metadata.
+    columns:
+      - name: repository
+        description: Unique GitHub owner/name.
+        data_tests: [unique, not_null]
+      - name: total_observed_prs
+        description: Stored unique repository/PR observations, not complete GitHub history.
+        data_tests: [not_null]
+      - name: open_prs
+        description: Count observed open, not verified currently open.
+      - name: merged_prs
+        description: Count with non-NULL merge timestamp.
+      - name: closed_without_merge_prs
+        description: Count observed closed with NULL merge timestamp.
+      - name: merge_rate
+        description: Merged / total observed PRs, fraction 0..1; NULL for an empty cohort.
+      - name: average_time_to_merge_hours
+        description: Mean valid elapsed creation-to-merge hours; NULL without samples.
+      - name: median_time_to_merge_hours
+        description: Middle valid merge duration in hours, averaging two middle values for even samples; NULL without samples.
+      - name: merge_duration_sample_count
+        description: Non-NULL durations used in merge mean and median.
+      - name: average_open_age_days
+        description: Mean age at each open PR's own extraction; NULL without samples.
+      - name: median_open_age_days
+        description: Median age at each open PR's own extraction; NULL without samples.
+      - name: open_age_sample_count
+        description: Non-NULL ages used in open-age mean and median.
+      - name: open_prs_older_than_7_days
+        description: Count of observed open PRs strictly older than 7 days at extraction (not >=7).
+      - name: earliest_pr_extraction_at_utc
+        description: Earliest contributing PR extraction, ISO UTC text; NULL without observations.
+      - name: latest_pr_extraction_at_utc
+        description: Latest contributing PR extraction, ISO UTC text; not necessarily the latest run.
+      - name: observation_run_ids
+        description: Sorted distinct supplying run IDs; NULL for no observations.
+      - name: all_observation_runs_pagination_complete
+        description: FALSE if any contributing run is incomplete; otherwise NULL if unknown/missing or no PRs; TRUE only if all known complete.
+      - name: prs_from_runs_with_source_errors
+        description: Number of PR observations supplied by a run with a non-NULL extraction error.
+      - name: latest_run_id
+        description: Latest repository run by extraction descending, with run_id ascending as tie breaker.
+      - name: latest_run_extracted_at_utc
+        description: Latest run's extraction start as ISO UTC text, independent of PR observation range.
+      - name: latest_run_pagination_complete
+        description: Nullable latest-run pagination completeness, not full history completeness.
+      - name: latest_run_stop_reason
+        description: Latest run's extraction stop reason.
+      - name: latest_run_source_error
+        description: Nullable latest source error.
+      - name: latest_run_accepted_records
+        description: Accepted records in the latest snapshot, not total stored PRs.
+      - name: latest_run_rejected_records
+        description: Rejected records in the latest snapshot.
+      - name: latest_run_quality_issues
+        description: JSON-encoded latest-run validation issues.
+      - name: cohort_scope
+        description: Explicit observed, potentially incomplete PR cohort label; never a developer productivity ranking.

@@ -1,0 +1,22 @@
+name: engineering_intelligence
+version: '1.0.0'
+config-version: 2
+profile: engineering_intelligence
+require-dbt-version: [">=1.12.6", "<1.13.0"]
+model-paths: [models]
+test-paths: [tests]
+target-path: target
+clean-targets: [target, dbt_packages]
+flags:
+  send_anonymous_usage_stats: false
+models:
+  engineering_intelligence:
+    staging:
+      +schema: staging
+      +materialized: view
+    intermediate:
+      +schema: intermediate
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table

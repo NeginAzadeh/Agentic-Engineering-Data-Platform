@@ -47,3 +47,10 @@ logs/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# dbt generated artifacts (keep profiles.yml and model SQL version-controlled)
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+dbt/.user.yml
+dbt/profiles.local.yml
