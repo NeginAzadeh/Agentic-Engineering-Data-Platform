@@ -1,5 +1,10 @@
 # Engineering Analytics & Business KPIs
 
+The parallel [dbt transformation layer](dbt_transformations.md) now materializes
+documented analytical models in a separate database and checks parity against
+these original SQL calculations. The existing reporting and Agent paths continue
+using this SQL unchanged.
+
 ## Run and artifacts
 
 From PowerShell in the project root, using the existing `.venv`:

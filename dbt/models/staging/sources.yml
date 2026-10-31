@@ -1,0 +1,38 @@
+version: 2
+sources:
+  - name: engineering_warehouse
+    description: >-
+      Validated local GitHub observations. Attached read-only. Bounded snapshots
+      are not complete repository history; missing PRs are not deleted by ingestion.
+    database: engineering_source
+    schema: main
+    tables:
+      - name: ingestion_runs
+        description: One row per loaded snapshot, identified by its content hash.
+        columns:
+          - name: run_id
+            description: SHA-256 snapshot identifier.
+            data_tests: [unique, not_null]
+          - name: repository
+            description: GitHub owner/name.
+            data_tests: [not_null]
+          - name: extracted_at
+            description: UTC-aware extraction start, not transformation time.
+            data_tests: [not_null]
+      - name: pull_requests
+        description: One newest stored observation per (repository, pr_number).
+        columns:
+          - name: repository
+            description: GitHub owner/name; part of the composite primary key.
+            data_tests: [not_null]
+          - name: pr_number
+            description: Repository-local positive PR number; part of the primary key.
+            data_tests: [not_null]
+          - name: last_run_id
+            description: Snapshot supplying this observation, possibly an older run.
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('engineering_warehouse', 'ingestion_runs')
+                    field: run_id

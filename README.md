@@ -8,6 +8,7 @@ Engineering teams need reliable information about how work moves from pull reque
 
 ## Completed functionality
 
+- Local dbt Core + dbt-duckdb transformation project: documented staging/lifecycle views and PR/repository analytical tables in a separate database, read-only source attachment, data tests, and independent parity checks against existing KPI SQL. See [the dbt guide](docs/dbt_transformations.md).
 - Multi-repository GitHub ingestion defaults to `dbt-labs/dbt-core` and `apache/airflow`, across open and closed PRs, sorted by creation time descending.
 - Pagination follows GitHub's next-page links, with 30 PRs per page and a configurable default maximum of 3 pages per repository (up to 90 PRs each).
 - New JSON snapshots in `data/raw/github/` preserve original PR objects plus repository, UTC extraction start/end times, source URL, record count, and per-page metadata.
@@ -66,6 +67,26 @@ Call a tool locally without a model or network access:
 ```
 
 The tool list uses an inclusive age threshold (`>=`); the existing KPI for older than 7 days remains strict (`>`). Both use age at each PR's extraction, not age today. Source freshness is a separate checked-at-time measure with a documented 24-hour threshold. An empty result means no matching local observations, not verified absence on GitHub. Existing ingestion, warehouse, analytics, and archived code are preserved.
+
+## Local dbt transformations
+
+dbt adds SQL dependencies, documented models, and data tests to the existing warehouse. It writes `engineering_dbt.duckdb`; the source warehouse and existing Agent/reporting paths are preserved.
+
+From PowerShell in the project root:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r .\requirements-dbt.txt
+$env:ENGINEERING_PROJECT_ROOT = (Get-Location).Path
+$env:DBT_SEND_ANONYMOUS_USAGE_STATS = "false"
+.\.venv\Scripts\dbt.exe debug --project-dir .\dbt --profiles-dir .\dbt
+.\.venv\Scripts\dbt.exe run --project-dir .\dbt --profiles-dir .\dbt
+.\.venv\Scripts\dbt.exe test --project-dir .\dbt --profiles-dir .\dbt
+.\.venv\Scripts\python.exe -m src.engineering_intelligence.verify_dbt_kpis
+```
+
+The source warehouse must exist. [The dbt guide](docs/dbt_transformations.md) explains the DAG, model grains, UTC and cohort semantics, controlled integration tests, actual validation results, and future Airflow orchestration. No cloud service or dbt account is required.
+
+Validated locally on 2026-10-31: all 5 models and 52 dbt data tests passed; all 183 Python tests passed. The KPI mart matched all 26 legacy output columns for both repositories, with zero discrepancies. These are observed, potentially incomplete cohorts.
 
 ## Local Ollama Agent
 
@@ -131,7 +152,6 @@ Fetching weather again overwrites its raw JSON; loading reuses the database. Git
 | Expanded agent workflows | Broader investigation features and expanded evaluation beyond the implemented local evaluation baseline |
 | GCP | Host cloud storage and pipeline workloads |
 | Airflow | Schedule and coordinate pipeline tasks |
-| dbt | Build documented and tested SQL transformations |
 | Docker | Package consistent runtime environments |
 | Terraform | Define cloud infrastructure as code |
 | CI/CD | Automate checks and later delivery of approved changes |
@@ -145,6 +165,8 @@ archive/weather_poc/          Preserved, runnable weather scripts
 src/engineering_intelligence/ Pipeline, KPI reporter, agent tools/schemas, and local Agent
 evaluations/                Version-controlled Agent questions and expected behavior
 sql/analytics/              Shared PR calculations and SQL report queries
+dbt/                        Local dbt project, profile, models, documentation, and SQL data tests
+requirements-dbt.txt        Pinned dbt dependencies; preserves the existing DuckDB version
 tests/                      Pipeline, tools, Agent, and offline evaluation tests
 docs/                       Architecture, pipeline, Agent, and evaluation guides
 data/raw/                   Original API responses (ignored by Git)

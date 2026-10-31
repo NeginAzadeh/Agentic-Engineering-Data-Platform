@@ -1,0 +1,4 @@
+# Local transformation tools; preserve the existing warehouse engine version.
+dbt-core==1.12.6
+dbt-duckdb==1.11.1
+duckdb==1.5.6
