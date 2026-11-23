@@ -78,6 +78,18 @@ separately. Scheduling remains manual, and the cooperative lock does not
 coordinate independent Windows writers. See [the Airflow guide](airflow_orchestration.md)
 for metadata/log evidence, setup, and operational limitations.
 
+## Implemented local observability
+
+`monitor_pipeline.py` reads an explicitly selected Airflow SQLite run or Docker
+exports, existing dbt/parity artifacts, and read-only warehouse quality evidence.
+It reuses the existing agent tool's freshness and completeness definitions rather
+than adding another quality calculation. A console summary and new ignored JSON
+report keep execution outcome, data health, and evidence limitations separate.
+Failures cannot be overwritten by a passing historical report, and missing
+evidence remains unknown. The CLI does not execute stages or poll services. See
+[the monitoring guide](pipeline_observability.md) for paths, exit codes, actual
+historical-run inspections, tests, and troubleshooting.
+
 ## Planned downstream consumers (not implemented)
 
 The read-only local Ollama Agent is implemented separately from its data tools; see below. Broader investigation workflows and dashboards remain planned.
@@ -155,7 +167,7 @@ The implemented evaluation layer sits outside the Agent: version-controlled `eva
 - `archive/weather_poc/`: preserved and runnable learning example.
 - `data/raw/`: original API responses.
 - `data/processed/`: local engineering and weather databases.
-- `data/reports/`: generated KPI and Agent evaluation JSON, excluded from version control.
+- `data/reports/`: generated KPI, validation, Agent evaluation, and monitoring JSON, excluded from version control.
 - `docs/`: design documentation.
 
 Data and `.venv/` remain local through `.gitignore`. Ingestion, quality checks,

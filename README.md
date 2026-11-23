@@ -8,6 +8,7 @@ Engineering teams need reliable information about how work moves from pull reque
 
 ## Completed functionality
 
+- One-shot local pipeline monitoring combines selected Airflow/Docker execution evidence, stored warehouse freshness/completeness/quality, and dbt/KPI parity results into a console summary and new ignored JSON report. Read-only inspection preserves failures and unknown evidence; it does not execute the pipeline or poll services. See [the monitoring guide](docs/pipeline_observability.md).
 - Docker Compose batch runtime executes the existing four-stage pipeline in one non-root container, with an explicit persistent data mount, shared lock, and existing timeouts. Offline container checks and a real isolated-data Compose run passed; Airflow/Ollama remain outside Docker. See [the Docker guide](docs/docker_containerization.md).
 - GitHub Actions CI workflow for PRs targeting `main` and pushes to `main`: separate Ubuntu/Python 3.12 pipeline/dbt and Airflow test jobs, read-only permissions, and pinned actions. Both jobs passed on GitHub, and the CI Pull Request was merged into `main`. See [the CI guide](docs/continuous_integration.md).
 - Airflow 3.3.2 on WSL2 Ubuntu 24.04 orchestrates ingestion -> warehouse loading -> dbt build -> KPI parity. A real manual run succeeded on 2026-11-23 with all four tasks successful and zero KPI discrepancies. See [the setup and validation evidence](docs/airflow_orchestration.md).
@@ -137,6 +138,22 @@ Docker socket access requires privilege. Buildx 0.30.1 is now installed permanen
 on WSL2 Ubuntu; the original validation used a temporary verified plugin and has
 not been rerun with the permanent installation.
 
+## Local monitoring
+
+Inspect existing data health without API calls or pipeline execution:
+
+```powershell
+.\.venv\Scripts\python.exe -m src.engineering_intelligence.monitor_pipeline --data-dir .\data
+```
+
+Reports are created under ignored `data/reports/monitoring/`. With no execution
+source supplied, execution remains `unknown`; exit `3` means warnings or missing
+evidence, while exit `1` means an observed failure or evidence error. Source
+freshness is separate from PR age, and pagination-limited snapshots remain
+incomplete. [The monitoring guide](docs/pipeline_observability.md) shows how to
+select an Airflow run or Docker exports, include existing dbt/parity reports,
+inspect stage durations, and troubleshoot failures.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` defines **Python and dbt tests** (the full suite with
@@ -225,7 +242,7 @@ This is a learning roadmap, not an implemented production system. Exact cloud se
 
 ```text
 archive/weather_poc/          Preserved, runnable weather scripts
-src/engineering_intelligence/ Pipeline, KPI reporter, agent tools/schemas, and local Agent
+src/engineering_intelligence/ Pipeline, monitoring/KPI reporters, agent tools/schemas, and local Agent
 evaluations/                Version-controlled Agent questions and expected behavior
 sql/analytics/              Shared PR calculations and SQL report queries
 dbt/                        Local dbt project, profile, models, documentation, and SQL data tests
@@ -238,7 +255,7 @@ tests/                      Pipeline, tools, Agent, and offline evaluation tests
 docs/                       Architecture, pipeline, Agent, and evaluation guides
 data/raw/                   Original API responses (ignored by Git)
 data/processed/             Engineering and weather databases (ignored by Git)
-data/reports/               Generated KPI and evaluation JSON reports (ignored by Git)
+data/reports/               Generated KPI, validation, evaluation, and monitoring JSON (ignored by Git)
 README.md                   Purpose, status, and run commands
 .gitignore                  Local files excluded from Git
 ```
