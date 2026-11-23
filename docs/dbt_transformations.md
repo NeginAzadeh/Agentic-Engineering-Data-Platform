@@ -199,14 +199,20 @@ must be investigated instead of changing established formulas to hide it. This
 proves consistency with existing calculations on the tested data, not correctness
 of GitHub's source records, complete history, or business causality.
 
-## Future Airflow orchestration
+## Validated local Airflow orchestration
 
-A later DAG can order ingestion -> warehouse load -> `dbt build` -> parity check
--> approved consumers. Each task must check the preceding command's exit code,
+The [Airflow orchestration deployment](airflow_orchestration.md) now runs on WSL2
+Ubuntu 24.04. Its real 2026-11-23 manual run succeeded, including `dbt build`
+(5 models + 52 data tests) and parity verification (2 repositories, 26 columns,
+zero discrepancies). The dbt models/profile and calculations are unchanged.
+
+The DAG orders ingestion -> warehouse load -> `dbt build` -> parity check.
+Future approved consumers can follow that validation. Tasks check exit codes,
 set the project-root environment variable, keep the source stable, and retain dbt
-artifacts for diagnosis. Airflow schedules and retries tasks; dbt owns SQL model
-dependencies and data tests. Airflow, dbt-based Agent integration, cloud services,
-and deployment remain unimplemented.
+artifacts for diagnosis. Airflow controls task scheduling and retry policy; dbt
+owns SQL model dependencies and data tests. The local Airflow execution is
+validated; recurring scheduling, dbt-based Agent integration, cloud services,
+and production deployment remain planned.
 
 ## Validation results
 

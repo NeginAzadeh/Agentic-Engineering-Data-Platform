@@ -22,7 +22,7 @@ The module follows GitHub next-page links with up to 30 PRs per page across both
 
 Successful pages survive later API failures. Failure metadata is saved even when no page succeeds. Save failures are reported separately, and remaining repositories are still attempted. Rate limits stop the affected repository with retry guidance, without automatic retries. API or save failures produce a nonzero exit code; reaching the page cap is an expected bounded extraction.
 
-Pagination is complete only when no next link remains. A cap, failure, or empty page with a next link is incomplete. Snapshots are not complete event history: PRs can change between page requests. The warehouse preserves completeness metadata and never deletes PRs simply because they are absent from a later bounded snapshot. There is no scheduler yet.
+Pagination is complete only when no next link remains. A cap, failure, or empty page with a next link is incomplete. Snapshots are not complete event history: PRs can change between page requests. The warehouse preserves completeness metadata and never deletes PRs simply because they are absent from a later bounded snapshot. Airflow's scheduler service runs locally, but this DAG has no automatic schedule (`schedule=None`) and is triggered manually.
 
 ## Implemented warehouse
 
@@ -60,6 +60,23 @@ staging models feed a PR lifecycle model, then a PR fact and repository KPI mart
 an independent Python check compares the mart against the unchanged SQL analytics.
 Existing Agent tools and reporters continue reading their original source. See
 [the dbt guide](dbt_transformations.md) for lineage, grains, commands, and results.
+
+## Validated local Airflow orchestration
+
+`orchestration/dags/engineering_pipeline.py` defines four Airflow 3 SDK tasks:
+ingestion -> warehouse -> dbt build -> KPI parity. A thin runner executes the
+existing commands using a separate Linux pipeline venv. One active DAG run/task,
+success-only dependencies, bounded timeouts, and a cooperative per-task lock
+protect the serial pipeline. Business logic remains in the existing scripts/SQL.
+
+The validated environment is WSL2 Ubuntu 24.04 with Airflow 3.3.2 standalone and
+local SQLite metadata, in a different Linux venv from dbt. The real manual run
+`manual__2026-11-23T09:21:18.097597+00:00` completed all four tasks successfully,
+including dbt build and KPI parity (2 repositories, 26 columns, zero discrepancies).
+The native Linux focused suite passed all 18 tests; Windows tests are reported
+separately. Scheduling remains manual, and the cooperative lock does not
+coordinate independent Windows writers. See [the Airflow guide](airflow_orchestration.md)
+for metadata/log evidence, setup, and operational limitations.
 
 ## Planned downstream consumers (not implemented)
 
@@ -115,7 +132,10 @@ Only native structured calls execute; apparent code in generated text or PR titl
 
 Answers without successful tool evidence are withheld. Unreturned URLs, certain explicit current-status claims, and executable code blocks are also withheld. Python always adds returned PR references, observation times, and available quality/freshness warnings. These checks are not a semantic proof of every sentence; generated prose must still be reviewed against source evidence. See [the local Agent guide](local_agent.md) for evaluation and operational limits.
 
-Airflow would coordinate tasks; Docker would package their runtime. GCP would host cloud resources, Terraform would define infrastructure, and CI/CD would automate checks and later delivery. Specific services, metric definitions, and deployment design remain undecided.
+The Airflow DAG now coordinates the existing stages in a validated local Linux
+deployment. Docker packaging remains planned.
+GCP would host cloud resources, Terraform would define infrastructure, and CI/CD
+would automate checks and later delivery. Deployment choices remain undecided.
 
 ## Folder responsibilities
 
@@ -131,4 +151,8 @@ The implemented evaluation layer sits outside the Agent: version-controlled `eva
 - `data/reports/`: generated KPI and Agent evaluation JSON, excluded from version control.
 - `docs/`: design documentation.
 
-Data and `.venv/` remain local through `.gitignore`. Ingestion, quality checks, warehouse, KPIs, agent tools, and local Ollama integration are implemented. dbt, dashboards, scheduling, cloud infrastructure, and broader Agent workflows remain planned.
+Data and `.venv/` remain local through `.gitignore`. Ingestion, quality checks,
+warehouse, KPIs, agent tools, local Ollama integration, dbt transformations, and
+validated local Airflow orchestration are implemented. Recurring scheduling,
+Docker, CI/CD, dashboards, cloud deployment, and broader Agent workflows remain
+planned.

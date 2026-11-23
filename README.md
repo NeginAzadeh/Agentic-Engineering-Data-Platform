@@ -8,6 +8,7 @@ Engineering teams need reliable information about how work moves from pull reque
 
 ## Completed functionality
 
+- Airflow 3.3.2 on WSL2 Ubuntu 24.04 orchestrates ingestion -> warehouse loading -> dbt build -> KPI parity. A real manual run succeeded on 2026-11-23 with all four tasks successful and zero KPI discrepancies. See [the setup and validation evidence](docs/airflow_orchestration.md).
 - Local dbt Core + dbt-duckdb transformation project: documented staging/lifecycle views and PR/repository analytical tables in a separate database, read-only source attachment, data tests, and independent parity checks against existing KPI SQL. See [the dbt guide](docs/dbt_transformations.md).
 - Multi-repository GitHub ingestion defaults to `dbt-labs/dbt-core` and `apache/airflow`, across open and closed PRs, sorted by creation time descending.
 - Pagination follows GitHub's next-page links, with 30 PRs per page and a configurable default maximum of 3 pages per repository (up to 90 PRs each).
@@ -84,9 +85,38 @@ $env:DBT_SEND_ANONYMOUS_USAGE_STATS = "false"
 .\.venv\Scripts\python.exe -m src.engineering_intelligence.verify_dbt_kpis
 ```
 
-The source warehouse must exist. [The dbt guide](docs/dbt_transformations.md) explains the DAG, model grains, UTC and cohort semantics, controlled integration tests, actual validation results, and future Airflow orchestration. No cloud service or dbt account is required.
+The source warehouse must exist. [The dbt guide](docs/dbt_transformations.md) explains the DAG, model grains, UTC and cohort semantics, controlled integration tests, actual validation results, and validated local Airflow orchestration. No cloud service or dbt account is required.
 
 Validated locally on 2026-10-31: all 5 models and 52 dbt data tests passed; all 183 Python tests passed. The KPI mart matched all 26 legacy output columns for both repositories, with zero discrepancies. These are observed, potentially incomplete cohorts.
+
+## Local Airflow orchestration
+
+The manual DAG in `orchestration/dags/engineering_pipeline.py` calls the existing
+pipeline commands in order, with success-only dependencies, bounded task/process
+timeouts, zero automatic retries, and one active run/task. It uses a separate
+Linux pipeline venv for dbt and DuckDB, retaining the read-only dbt source
+attachment and separate transformed database. The Windows `.venv` is preserved.
+
+The free **WSL2 Ubuntu 24.04 + Airflow 3.3.2 standalone** deployment is validated,
+with release constraints and two isolated Linux environments. Run
+`manual__2026-11-23T09:21:18.097597+00:00` succeeded in a reported 31.620 seconds:
+all four tasks passed, and KPI parity matched 2 repositories and 26 columns with
+zero discrepancies. [The Airflow guide](docs/airflow_orchestration.md) records
+metadata/log/report evidence, setup/path checks, UI/manual-trigger commands,
+scheduling, logs, cleanup, and operational limitations. Airflow's scheduler service
+runs, but this DAG has no automatic schedule (`schedule=None`); runs are triggered
+manually. Recurring scheduling remains planned.
+
+Run the deterministic orchestration tests on Windows without installing Airflow:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -p test_airflow_orchestration.py -v
+```
+
+Finalization on 2026-11-23: the Linux Airflow focused suite passed **18/18 tests**.
+The Windows complete suite had **200 passed, 1 expected native Airflow skip, zero
+failures** across 201 tests, including real dbt fixture builds. These automated
+checks are separate from the successful real DAG execution recorded above.
 
 ## Local Ollama Agent
 
@@ -148,10 +178,10 @@ Fetching weather again overwrites its raw JSON; loading reuses the database. Git
 
 | Component | Intended purpose |
 | --- | --- |
+| Recurring scheduling | Enable automatic execution of the implemented Airflow DAG, currently configured with `schedule=None` |
 | Dashboard | Present engineering metrics and trends |
 | Expanded agent workflows | Broader investigation features and expanded evaluation beyond the implemented local evaluation baseline |
 | GCP | Host cloud storage and pipeline workloads |
-| Airflow | Schedule and coordinate pipeline tasks |
 | Docker | Package consistent runtime environments |
 | Terraform | Define cloud infrastructure as code |
 | CI/CD | Automate checks and later delivery of approved changes |
@@ -167,6 +197,7 @@ evaluations/                Version-controlled Agent questions and expected beha
 sql/analytics/              Shared PR calculations and SQL report queries
 dbt/                        Local dbt project, profile, models, documentation, and SQL data tests
 requirements-dbt.txt        Pinned dbt dependencies; preserves the existing DuckDB version
+orchestration/              Airflow DAG, thin command runner, and isolated Linux setup
 tests/                      Pipeline, tools, Agent, and offline evaluation tests
 docs/                       Architecture, pipeline, Agent, and evaluation guides
 data/raw/                   Original API responses (ignored by Git)
