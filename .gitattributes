@@ -1,0 +1,2 @@
+# Shell scripts are sourced by Linux even when this checkout is on Windows.
+orchestration/*.sh text eol=lf

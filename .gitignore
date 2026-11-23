@@ -54,3 +54,11 @@ dbt/logs/
 dbt/dbt_packages/
 dbt/.user.yml
 dbt/profiles.local.yml
+
+# Airflow local state (the documented AIRFLOW_HOME is outside the repository)
+.airflow/
+airflow.cfg
+airflow.db*
+airflow-webserver.pid
+standalone_admin_password.txt
+simple_auth_manager_passwords.json.generated

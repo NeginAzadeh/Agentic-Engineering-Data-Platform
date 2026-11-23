@@ -1,0 +1,3 @@
+# Install into a NEW Linux pipeline venv, never the Airflow or Windows venv.
+-r ../requirements-dbt.txt
+requests==2.34.2
