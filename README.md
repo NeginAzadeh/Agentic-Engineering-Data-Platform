@@ -8,6 +8,7 @@ Engineering teams need reliable information about how work moves from pull reque
 
 ## Completed functionality
 
+- GitHub Actions CI workflow for PRs targeting `main` and pushes to `main`: separate Ubuntu/Python 3.12 pipeline/dbt and Airflow test jobs, read-only permissions, and pinned actions. Both jobs are validated locally; hosted execution awaits the first user-pushed PR/main event. See [the CI guide](docs/continuous_integration.md).
 - Airflow 3.3.2 on WSL2 Ubuntu 24.04 orchestrates ingestion -> warehouse loading -> dbt build -> KPI parity. A real manual run succeeded on 2026-11-23 with all four tasks successful and zero KPI discrepancies. See [the setup and validation evidence](docs/airflow_orchestration.md).
 - Local dbt Core + dbt-duckdb transformation project: documented staging/lifecycle views and PR/repository analytical tables in a separate database, read-only source attachment, data tests, and independent parity checks against existing KPI SQL. See [the dbt guide](docs/dbt_transformations.md).
 - Multi-repository GitHub ingestion defaults to `dbt-labs/dbt-core` and `apache/airflow`, across open and closed PRs, sorted by creation time descending.
@@ -118,6 +119,20 @@ The Windows complete suite had **200 passed, 1 expected native Airflow skip, zer
 failures** across 201 tests, including real dbt fixture builds. These automated
 checks are separate from the successful real DAG execution recorded above.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` defines **Python and dbt tests** (the full suite with
+isolated DuckDB/dbt fixtures) and **Airflow DAG validation** (a separate Linux
+Airflow environment including native DAG import). The checks run on PRs targeting
+`main` and pushes to `main`, using standard Ubuntu runners and Python 3.12.
+
+CI runs mocked/isolated tests without live ingestion, Ollama inference, or DAG
+execution. No secrets or existing project data are required. Actions use pinned
+commit SHAs, checkout credentials are not persisted, and permissions are limited
+to `contents: read`. See [the CI guide](docs/continuous_integration.md) for design,
+local results, expected skips, and how to investigate failed checks. Local jobs
+passed; actual GitHub-hosted execution remains to be verified after a user push.
+
 ## Local Ollama Agent
 
 Use the installed Ollama application and existing locally downloaded `qwen3:4b-instruct`. Verify that Ollama is running and `ollama list` includes that exact tag. If the server is not running, start Ollama or run `ollama serve` in another terminal. The app does not download a model or contact a cloud provider.
@@ -184,7 +199,7 @@ Fetching weather again overwrites its raw JSON; loading reuses the database. Git
 | GCP | Host cloud storage and pipeline workloads |
 | Docker | Package consistent runtime environments |
 | Terraform | Define cloud infrastructure as code |
-| CI/CD | Automate checks and later delivery of approved changes |
+| CD/deployment | Deliver approved changes; the CI workflow is implemented separately |
 
 This is a learning roadmap, not an implemented production system. Exact cloud services and deployment choices remain undecided.
 
@@ -198,6 +213,7 @@ sql/analytics/              Shared PR calculations and SQL report queries
 dbt/                        Local dbt project, profile, models, documentation, and SQL data tests
 requirements-dbt.txt        Pinned dbt dependencies; preserves the existing DuckDB version
 orchestration/              Airflow DAG, thin command runner, and isolated Linux setup
+.github/workflows/          GitHub Actions CI for Python/dbt tests and Airflow DAG validation
 tests/                      Pipeline, tools, Agent, and offline evaluation tests
 docs/                       Architecture, pipeline, Agent, and evaluation guides
 data/raw/                   Original API responses (ignored by Git)

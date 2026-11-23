@@ -1,0 +1,102 @@
+name: CI
+
+"on":
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  python-tests:
+    name: Python and dbt tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.12
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements-dbt.txt
+            orchestration/requirements-pipeline.txt
+      - name: Install pipeline test dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r orchestration/requirements-pipeline.txt
+          .venv/bin/python -m pip check
+      - name: Verify dbt integration prerequisites
+        run: |
+          .venv/bin/python - <<'PY'
+          import sys
+          from pathlib import Path
+          import duckdb
+          from dbt.cli.main import dbtRunner
+
+          assert sys.version_info[:2] == (3, 12)
+          assert Path(sys.executable).with_name('dbt').is_file(), 'dbt integration tests must not skip'
+          PY
+      - name: Run complete Python suite with isolated DuckDB and dbt fixtures
+        run: .venv/bin/python -m unittest discover -s tests -v
+
+  airflow-tests:
+    name: Airflow DAG validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: ${{ github.workspace }}/orchestration/dags
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.12
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: orchestration/requirements-airflow.txt
+      - name: Install isolated Airflow test dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r orchestration/requirements-airflow.txt
+          .venv/bin/python -m pip check
+      - name: Verify native Airflow prerequisites
+        env:
+          AIRFLOW_HOME: ${{ runner.temp }}/airflow-ci
+        run: |
+          .venv/bin/python - <<'PY'
+          import sys
+          import airflow
+          from airflow.dag_processing.dagbag import DagBag
+
+          assert sys.platform == 'linux'
+          assert sys.version_info[:2] == (3, 12)
+          assert airflow.__version__ == '3.3.2', 'native validation requires the pinned Airflow release'
+          PY
+      - name: Validate DAG import, dependencies, and safety controls without running tasks
+        env:
+          AIRFLOW_HOME: ${{ runner.temp }}/airflow-ci
+        run: .venv/bin/python -m unittest discover -s tests -p test_airflow_orchestration.py -v

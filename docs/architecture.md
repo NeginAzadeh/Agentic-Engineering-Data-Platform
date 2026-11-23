@@ -133,9 +133,12 @@ Only native structured calls execute; apparent code in generated text or PR titl
 Answers without successful tool evidence are withheld. Unreturned URLs, certain explicit current-status claims, and executable code blocks are also withheld. Python always adds returned PR references, observation times, and available quality/freshness warnings. These checks are not a semantic proof of every sentence; generated prose must still be reviewed against source evidence. See [the local Agent guide](local_agent.md) for evaluation and operational limits.
 
 The Airflow DAG now coordinates the existing stages in a validated local Linux
-deployment. Docker packaging remains planned.
-GCP would host cloud resources, Terraform would define infrastructure, and CI/CD
-would automate checks and later delivery. Deployment choices remain undecided.
+deployment. Docker packaging remains planned. GitHub Actions CI now defines
+separate Ubuntu/Python 3.12 pipeline/dbt and Airflow import test jobs for PRs and
+pushes to main. The jobs are validated locally; hosted execution remains pending
+the first user-pushed event. They execute tests only, with read-only permissions,
+and do not run live ingestion, inference, or the DAG. See [the CI guide](continuous_integration.md).
+GCP hosting, Terraform infrastructure, and CD/deployment remain planned.
 
 ## Folder responsibilities
 
@@ -153,6 +156,7 @@ The implemented evaluation layer sits outside the Agent: version-controlled `eva
 
 Data and `.venv/` remain local through `.gitignore`. Ingestion, quality checks,
 warehouse, KPIs, agent tools, local Ollama integration, dbt transformations, and
-validated local Airflow orchestration are implemented. Recurring scheduling,
-Docker, CI/CD, dashboards, cloud deployment, and broader Agent workflows remain
-planned.
+validated local Airflow orchestration are implemented. The CI workflow is
+implemented and validated locally; GitHub-hosted execution is still to be checked.
+Recurring scheduling, Docker, CD/deployment, dashboards, cloud infrastructure,
+and broader Agent workflows remain planned.
