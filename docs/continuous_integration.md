@@ -22,10 +22,11 @@ missing dbt installation cannot silently skip the integration class. The Airflow
 job verifies Linux, Python 3.12, the pinned Airflow version, and its supported
 `DagBag` import before testing. Native Airflow validation must execute there.
 
-The full suite currently discovers 201 tests: 200 pass and the single native
+With the Docker milestone's eight offline unit tests, the full suite now
+discovers 209 tests: 208 pass and the single native
 Airflow test skips because that job deliberately has no Airflow installation.
 The separate Airflow job runs all 18 orchestration tests, including that native
-test, with no skips. These totals overlap; they are not 219 distinct tests.
+test, with no skips. These totals overlap; they are not 227 distinct tests.
 Test counts will grow as the project adds coverage.
 
 The dbt tests create controlled source/output DuckDB files in temporary
@@ -148,7 +149,7 @@ not be replaced with a live end-to-end pipeline run in CI.
 
 ## Local validation and remaining hosted checks
 
-Local validation on 2026-11-23 used fresh Linux checkouts exported from Git
+Initial CI-milestone validation on 2026-11-23 used fresh Linux checkouts exported from Git
 (no ignored raw data/warehouses), new Python 3.12.3 virtual environments, and the
 workflow's own shell steps. Both dependency installs passed `pip check`.
 
