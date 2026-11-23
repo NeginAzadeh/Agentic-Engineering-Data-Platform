@@ -133,10 +133,14 @@ Only native structured calls execute; apparent code in generated text or PR titl
 Answers without successful tool evidence are withheld. Unreturned URLs, certain explicit current-status claims, and executable code blocks are also withheld. Python always adds returned PR references, observation times, and available quality/freshness warnings. These checks are not a semantic proof of every sentence; generated prose must still be reviewed against source evidence. See [the local Agent guide](local_agent.md) for evaluation and operational limits.
 
 The Airflow DAG now coordinates the existing stages in a validated local Linux
-deployment. Docker packaging remains planned. GitHub Actions CI now defines
+deployment. Docker packaging is implemented as one non-root Compose batch service
+running the same four stages, with a required data mount and a run-wide shared
+lock. Airflow and Ollama remain outside the container; validation used new data
+directories rather than the existing host warehouse. See [the Docker guide](docker_containerization.md).
+GitHub Actions CI defines
 separate Ubuntu/Python 3.12 pipeline/dbt and Airflow import test jobs for PRs and
-pushes to main. The jobs are validated locally; hosted execution remains pending
-the first user-pushed event. They execute tests only, with read-only permissions,
+pushes to main. Both jobs passed on GitHub, and the CI Pull Request was merged
+into `main`. They execute tests only, with read-only permissions,
 and do not run live ingestion, inference, or the DAG. See [the CI guide](continuous_integration.md).
 GCP hosting, Terraform infrastructure, and CD/deployment remain planned.
 
@@ -157,6 +161,7 @@ The implemented evaluation layer sits outside the Agent: version-controlled `eva
 Data and `.venv/` remain local through `.gitignore`. Ingestion, quality checks,
 warehouse, KPIs, agent tools, local Ollama integration, dbt transformations, and
 validated local Airflow orchestration are implemented. The CI workflow is
-implemented and validated locally; GitHub-hosted execution is still to be checked.
-Recurring scheduling, Docker, CD/deployment, dashboards, cloud infrastructure,
+implemented and validated locally and on GitHub; the CI Pull Request is merged into `main`.
+The Docker Compose runtime is implemented and validated with isolated fixtures
+and a real live API run. Recurring scheduling, CD/deployment, dashboards, cloud infrastructure,
 and broader Agent workflows remain planned.

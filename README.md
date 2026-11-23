@@ -8,7 +8,8 @@ Engineering teams need reliable information about how work moves from pull reque
 
 ## Completed functionality
 
-- GitHub Actions CI workflow for PRs targeting `main` and pushes to `main`: separate Ubuntu/Python 3.12 pipeline/dbt and Airflow test jobs, read-only permissions, and pinned actions. Both jobs are validated locally; hosted execution awaits the first user-pushed PR/main event. See [the CI guide](docs/continuous_integration.md).
+- Docker Compose batch runtime executes the existing four-stage pipeline in one non-root container, with an explicit persistent data mount, shared lock, and existing timeouts. Offline container checks and a real isolated-data Compose run passed; Airflow/Ollama remain outside Docker. See [the Docker guide](docs/docker_containerization.md).
+- GitHub Actions CI workflow for PRs targeting `main` and pushes to `main`: separate Ubuntu/Python 3.12 pipeline/dbt and Airflow test jobs, read-only permissions, and pinned actions. Both jobs passed on GitHub, and the CI Pull Request was merged into `main`. See [the CI guide](docs/continuous_integration.md).
 - Airflow 3.3.2 on WSL2 Ubuntu 24.04 orchestrates ingestion -> warehouse loading -> dbt build -> KPI parity. A real manual run succeeded on 2026-11-23 with all four tasks successful and zero KPI discrepancies. See [the setup and validation evidence](docs/airflow_orchestration.md).
 - Local dbt Core + dbt-duckdb transformation project: documented staging/lifecycle views and PR/repository analytical tables in a separate database, read-only source attachment, data tests, and independent parity checks against existing KPI SQL. See [the dbt guide](docs/dbt_transformations.md).
 - Multi-repository GitHub ingestion defaults to `dbt-labs/dbt-core` and `apache/airflow`, across open and closed PRs, sorted by creation time descending.
@@ -119,6 +120,23 @@ The Windows complete suite had **200 passed, 1 expected native Airflow skip, zer
 failures** across 201 tests, including real dbt fixture builds. These automated
 checks are separate from the successful real DAG execution recorded above.
 
+## Docker Compose pipeline
+
+Use Docker Engine and Compose on WSL2 Ubuntu 24.04. `Dockerfile`, `.dockerignore`,
+and `compose.yaml` package only the pipeline runtime. `PIPELINE_DATA_DIR` is
+required; the existing project `data/` is never mounted by default. The container
+runs ingestion -> warehouse loading -> dbt build -> KPI parity and stops on the
+first failure. Airflow, Ollama, and the existing CI workflow are preserved.
+
+The [Docker guide](docs/docker_containerization.md) provides prerequisite checks,
+non-root UID/GID mapping, safe network-disabled fixture validation, persistent
+paths, manual Compose commands, and cleanup. Actual validation: 8 container unit
+tests and 11 real dbt integration tests passed; a separate live Compose run exited
+0 in 15.149 seconds, with 5 models + 52 dbt tests and zero KPI discrepancies.
+Docker socket access requires privilege. Buildx 0.30.1 is now installed permanently
+on WSL2 Ubuntu; the original validation used a temporary verified plugin and has
+not been rerun with the permanent installation.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` defines **Python and dbt tests** (the full suite with
@@ -130,8 +148,9 @@ CI runs mocked/isolated tests without live ingestion, Ollama inference, or DAG
 execution. No secrets or existing project data are required. Actions use pinned
 commit SHAs, checkout credentials are not persisted, and permissions are limited
 to `contents: read`. See [the CI guide](docs/continuous_integration.md) for design,
-local results, expected skips, and how to investigate failed checks. Local jobs
-passed; actual GitHub-hosted execution remains to be verified after a user push.
+local results, expected skips, and how to investigate failed checks. Both the
+Python/dbt and Airflow jobs have passed on GitHub, and the CI Pull Request was
+merged into `main`.
 
 ## Local Ollama Agent
 
@@ -197,7 +216,6 @@ Fetching weather again overwrites its raw JSON; loading reuses the database. Git
 | Dashboard | Present engineering metrics and trends |
 | Expanded agent workflows | Broader investigation features and expanded evaluation beyond the implemented local evaluation baseline |
 | GCP | Host cloud storage and pipeline workloads |
-| Docker | Package consistent runtime environments |
 | Terraform | Define cloud infrastructure as code |
 | CD/deployment | Deliver approved changes; the CI workflow is implemented separately |
 
@@ -214,6 +232,8 @@ dbt/                        Local dbt project, profile, models, documentation, a
 requirements-dbt.txt        Pinned dbt dependencies; preserves the existing DuckDB version
 orchestration/              Airflow DAG, thin command runner, and isolated Linux setup
 .github/workflows/          GitHub Actions CI for Python/dbt tests and Airflow DAG validation
+Dockerfile / compose.yaml   Local pipeline image and explicit persistent data mount
+containerization/           Thin Docker entry point reusing existing stage helpers
 tests/                      Pipeline, tools, Agent, and offline evaluation tests
 docs/                       Architecture, pipeline, Agent, and evaluation guides
 data/raw/                   Original API responses (ignored by Git)

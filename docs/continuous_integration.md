@@ -22,10 +22,11 @@ missing dbt installation cannot silently skip the integration class. The Airflow
 job verifies Linux, Python 3.12, the pinned Airflow version, and its supported
 `DagBag` import before testing. Native Airflow validation must execute there.
 
-The full suite currently discovers 201 tests: 200 pass and the single native
+With the Docker milestone's eight offline unit tests, the full suite now
+discovers 209 tests: 208 pass and the single native
 Airflow test skips because that job deliberately has no Airflow installation.
 The separate Airflow job runs all 18 orchestration tests, including that native
-test, with no skips. These totals overlap; they are not 219 distinct tests.
+test, with no skips. These totals overlap; they are not 227 distinct tests.
 Test counts will grow as the project adds coverage.
 
 The dbt tests create controlled source/output DuckDB files in temporary
@@ -108,7 +109,7 @@ need investigation. A canceled run was superseded; inspect the newest commit.
 Waiting for contributor approval is a GitHub policy state, not a passing test.
 
 The workflow does not create comments, modify code, auto-merge, or automatically
-enforce branch protection. After the first hosted run, a maintainer can choose
+enforce branch protection. A maintainer can choose
 **Python and dbt tests** and **Airflow DAG validation** as required checks in
 repository rules. That configuration is outside this milestone.
 
@@ -146,9 +147,9 @@ export PYTHONPATH="$PWD"
 Use unused temporary environment paths. These commands run tests only and must
 not be replaced with a live end-to-end pipeline run in CI.
 
-## Local validation and remaining hosted checks
+## Local validation history and successful hosted CI
 
-Local validation on 2026-11-23 used fresh Linux checkouts exported from Git
+Initial CI-milestone validation on 2026-11-23 used fresh Linux checkouts exported from Git
 (no ignored raw data/warehouses), new Python 3.12.3 virtual environments, and the
 workflow's own shell steps. Both dependency installs passed `pip check`.
 
@@ -175,13 +176,13 @@ for the pipeline job and 40 seconds for the final Airflow retest locally. Pip's
 download cache may have been reused. These are local timings,
 not guarantees for hosted runners or cache hits.
 
-**GitHub-hosted execution has not happened.** It requires the user to push this
-workflow and open/update a PR targeting `main`, or later push/merge to `main`.
-No commit, push, PR creation, branch-rule change, or hosted run was performed.
-Checkout action execution, setup-python downloads/cache integration, event
-delivery, fork-approval policy, and visible check statuses must still be confirmed
-on GitHub. Passing local job commands is not a claim that the hosted workflow has
-already passed.
+**GitHub-hosted CI has now passed:** both **Python and dbt tests** and
+**Airflow DAG validation** succeeded on GitHub, and the CI Pull Request was merged
+into `main`. The local validation results above remain the original implementation
+evidence; the hosted success is subsequent validation, not a rerun of those local
+checks. A successful hosted run does not establish every fork-approval, cache-hit,
+or branch-protection scenario. Repository rule configuration remains outside
+this milestone.
 
 This milestone preserves all existing business logic, test files, dependency
 files, and project data. CI covers tested code contracts and controlled dbt

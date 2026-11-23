@@ -1,0 +1,20 @@
+services:
+  pipeline:
+    image: agentic-engineering-pipeline:local
+    build:
+      context: .
+    user: "${PIPELINE_UID:-1000}:${PIPELINE_GID:-1000}"
+    init: true
+    restart: "no"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - type: bind
+        source: ${PIPELINE_DATA_DIR:?Set PIPELINE_DATA_DIR to an existing absolute Linux data directory}
+        target: /app/data
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=268435456,mode=1777
+    stop_grace_period: 20s
