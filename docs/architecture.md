@@ -22,7 +22,7 @@ The module follows GitHub next-page links with up to 30 PRs per page across both
 
 Successful pages survive later API failures. Failure metadata is saved even when no page succeeds. Save failures are reported separately, and remaining repositories are still attempted. Rate limits stop the affected repository with retry guidance, without automatic retries. API or save failures produce a nonzero exit code; reaching the page cap is an expected bounded extraction.
 
-Pagination is complete only when no next link remains. A cap, failure, or empty page with a next link is incomplete. Snapshots are not complete event history: PRs can change between page requests. The warehouse preserves completeness metadata and never deletes PRs simply because they are absent from a later bounded snapshot. There is no scheduler yet.
+Pagination is complete only when no next link remains. A cap, failure, or empty page with a next link is incomplete. Snapshots are not complete event history: PRs can change between page requests. The warehouse preserves completeness metadata and never deletes PRs simply because they are absent from a later bounded snapshot. Airflow's scheduler service runs locally, but this DAG has no automatic schedule (`schedule=None`) and is triggered manually.
 
 ## Implemented warehouse
 
@@ -151,4 +151,8 @@ The implemented evaluation layer sits outside the Agent: version-controlled `eva
 - `data/reports/`: generated KPI and Agent evaluation JSON, excluded from version control.
 - `docs/`: design documentation.
 
-Data and `.venv/` remain local through `.gitignore`. Ingestion, quality checks, warehouse, KPIs, agent tools, and local Ollama integration are implemented. dbt, dashboards, scheduling, cloud infrastructure, and broader Agent workflows remain planned.
+Data and `.venv/` remain local through `.gitignore`. Ingestion, quality checks,
+warehouse, KPIs, agent tools, local Ollama integration, dbt transformations, and
+validated local Airflow orchestration are implemented. Recurring scheduling,
+Docker, CI/CD, dashboards, cloud deployment, and broader Agent workflows remain
+planned.

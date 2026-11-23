@@ -85,7 +85,7 @@ $env:DBT_SEND_ANONYMOUS_USAGE_STATS = "false"
 .\.venv\Scripts\python.exe -m src.engineering_intelligence.verify_dbt_kpis
 ```
 
-The source warehouse must exist. [The dbt guide](docs/dbt_transformations.md) explains the DAG, model grains, UTC and cohort semantics, controlled integration tests, actual validation results, and future Airflow orchestration. No cloud service or dbt account is required.
+The source warehouse must exist. [The dbt guide](docs/dbt_transformations.md) explains the DAG, model grains, UTC and cohort semantics, controlled integration tests, actual validation results, and validated local Airflow orchestration. No cloud service or dbt account is required.
 
 Validated locally on 2026-10-31: all 5 models and 52 dbt data tests passed; all 183 Python tests passed. The KPI mart matched all 26 legacy output columns for both repositories, with zero discrepancies. These are observed, potentially incomplete cohorts.
 
@@ -103,7 +103,9 @@ with release constraints and two isolated Linux environments. Run
 all four tasks passed, and KPI parity matched 2 repositories and 26 columns with
 zero discrepancies. [The Airflow guide](docs/airflow_orchestration.md) records
 metadata/log/report evidence, setup/path checks, UI/manual-trigger commands,
-scheduling, logs, cleanup, and operational limitations. Scheduling remains manual.
+scheduling, logs, cleanup, and operational limitations. Airflow's scheduler service
+runs, but this DAG has no automatic schedule (`schedule=None`); runs are triggered
+manually. Recurring scheduling remains planned.
 
 Run the deterministic orchestration tests on Windows without installing Airflow:
 
@@ -176,6 +178,7 @@ Fetching weather again overwrites its raw JSON; loading reuses the database. Git
 
 | Component | Intended purpose |
 | --- | --- |
+| Recurring scheduling | Enable automatic execution of the implemented Airflow DAG, currently configured with `schedule=None` |
 | Dashboard | Present engineering metrics and trends |
 | Expanded agent workflows | Broader investigation features and expanded evaluation beyond the implemented local evaluation baseline |
 | GCP | Host cloud storage and pipeline workloads |
