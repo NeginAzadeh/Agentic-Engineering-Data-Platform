@@ -2,6 +2,10 @@
 
 ## Purpose and architecture
 
+For the latest recorded model outcomes, see the [focused reliability review](#focused-reliability-review-2026-10-21).
+Earlier sections retain development-stage failures and the conclusions reached
+at those stages; later evaluations do not replace or erase their reports.
+
 An evaluation case is a question plus a contract for observable behavior. Unlike an exact-answer snapshot, the contract checks operations and evidence rather than a particular sentence. The version-controlled dataset, `evaluations/agent_cases.json`, contains 18 questions across single-repository KPIs, comparisons, stale PRs, stored PR details, freshness/quality, missing data, unsupported requests, and injection attempts.
 
 ```text

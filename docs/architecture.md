@@ -1,5 +1,16 @@
 ﻿# Project architecture
 
+The [README architecture diagram](../README.md#architecture) is the portfolio
+overview. [The isolated demo](demo.md) reproduces transformations without live
+services, and [engineering evidence](engineering_evidence.md) separates tested
+contracts from historical operational runs and Agent accuracy limitations.
+
+Airflow standalone and Docker Compose are alternative local execution paths for
+the same four stages. Airflow and Ollama are outside the pipeline container.
+The Agent still reads the source warehouse through the existing SQL; dbt writes
+a separate transformed database. Host-side monitoring reads existing evidence
+and never executes or schedules the pipeline.
+
 ## Current GitHub pipeline
 
 ```text

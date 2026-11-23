@@ -118,8 +118,8 @@ print(connection.execute("""
 connection.close()
 ```
 
-Timestamp text conversion keeps these examples usable in the current environment. DuckDB's direct Python conversion of `TIMESTAMPTZ` values requires the optional `pytz` package, which is not installed; storage, SQL queries, and these text results work without adding it.
+Timestamp text conversion keeps these examples independent of optional Python timezone-conversion packages. The original warehouse-only environment lacked `pytz`; the currently validated project environment includes it. These SQL/text examples work in either case.
 
 JSON preserves the complete original response. The database stores selected, validated fields in typed rows, providing SQL queries, uniqueness rules, and updates. Raw files remain the source for inspection and future reprocessing.
 
-The loader exits with code 1 for file/metadata errors, quality issues, source extraction errors, or database failures, after attempting available valid repositories. Expected pagination incompleteness alone is not a failure. No AI, dashboards, cloud infrastructure, or KPI calculations are implemented.
+The loader exits with code 1 for file/metadata errors, quality issues, source extraction errors, or database failures, after attempting available valid repositories. Expected pagination incompleteness alone is not a failure. This loader does not calculate KPIs or call an AI model. Those separately implemented layers are documented in [analytics](analytics.md) and [the local Agent](local_agent.md); dashboards and cloud infrastructure remain planned.

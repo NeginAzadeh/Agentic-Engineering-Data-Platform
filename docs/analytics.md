@@ -107,10 +107,10 @@ The report includes:
 - A `repositories` list with repository identity, cohort/provenance context, numeric `metrics`, and all per-PR `open_prs` ages.
 - Latest ingestion errors, accepted/rejected counts, and quality issue details.
 
-Generated timestamps and filenames can differ across runs; KPI values remain reproducible for an unchanged warehouse. JSON null means unavailable, never NaN or infinity. Full numeric precision is retained in JSON; display rounding affects only console output. This artifact is prepared for future consumers, but no AI Agent is implemented.
+Generated timestamps and filenames can differ across runs; KPI values remain reproducible for an unchanged warehouse. JSON null means unavailable, never NaN or infinity. Full numeric precision is retained in JSON; display rounding affects only console output. The implemented [local Agent](local_agent.md) retrieves metrics through read-only tools using the same SQL; it does not consume this JSON report directly.
 
 ## Validation
 
 Automated tests use isolated controlled DuckDB datasets. They check known counts/rates, odd and even medians, fractional time calculations, the seven-day boundary, multiple repositories and ingestion runs, failed latest extractions, mixed observation times, missing provenance, null/invalid durations, empty datasets, deterministic calculations without the clock, JSON export, and preservation of a read-only database.
 
-No dbt models, dashboard, cloud services, AI Agent, or developer ranking is introduced by this milestone.
+The original analytics milestone introduced no dbt models or AI Agent. Those layers are now implemented separately; see [dbt transformations](dbt_transformations.md) and [the local Agent](local_agent.md). Dashboards and cloud deployment remain planned; developer productivity ranking is unsupported.
