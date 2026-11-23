@@ -139,8 +139,8 @@ lock. Airflow and Ollama remain outside the container; validation used new data
 directories rather than the existing host warehouse. See [the Docker guide](docker_containerization.md).
 GitHub Actions CI defines
 separate Ubuntu/Python 3.12 pipeline/dbt and Airflow import test jobs for PRs and
-pushes to main. The jobs are validated locally; hosted execution remains pending
-the first user-pushed event. They execute tests only, with read-only permissions,
+pushes to main. Both jobs passed on GitHub, and the CI Pull Request was merged
+into `main`. They execute tests only, with read-only permissions,
 and do not run live ingestion, inference, or the DAG. See [the CI guide](continuous_integration.md).
 GCP hosting, Terraform infrastructure, and CD/deployment remain planned.
 
@@ -161,7 +161,7 @@ The implemented evaluation layer sits outside the Agent: version-controlled `eva
 Data and `.venv/` remain local through `.gitignore`. Ingestion, quality checks,
 warehouse, KPIs, agent tools, local Ollama integration, dbt transformations, and
 validated local Airflow orchestration are implemented. The CI workflow is
-implemented and validated locally; GitHub-hosted execution is still to be checked.
+implemented and validated locally and on GitHub; the CI Pull Request is merged into `main`.
 The Docker Compose runtime is implemented and validated with isolated fixtures
 and a real live API run. Recurring scheduling, CD/deployment, dashboards, cloud infrastructure,
 and broader Agent workflows remain planned.

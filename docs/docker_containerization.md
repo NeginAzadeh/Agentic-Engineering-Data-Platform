@@ -23,28 +23,28 @@ is required. Existing Airflow and GitHub Actions files are unchanged.
 ## Runtime and prerequisites
 
 Use Docker Engine, Docker Compose v2, and Buildx on **WSL2 Ubuntu 24.04**. Docker
-Desktop is not required. On this machine, Docker Engine 29.1.3 and Compose
-2.40.3 were installed, but:
+Desktop is not required. During the original validation, Docker Engine 29.1.3 and
+Compose 2.40.3 were installed, with the following access/builder conditions:
 
 - The normal WSL user could not access `/var/run/docker.sock`; passwordless sudo
   was unavailable. Validation used WSL root for Docker commands only. Containers
   still ran as UID/GID 1000. No group membership or socket permission was changed.
-- Buildx was missing. Validation used Docker's official Buildx v0.39.1 binary in
-  a temporary, isolated `DOCKER_CONFIG`, verified against its release checksum.
+- Buildx was missing at that time. Validation used Docker's official Buildx
+  v0.39.1 binary in a temporary, isolated `DOCKER_CONFIG`, verified against its release checksum.
   No system package or existing Docker credential/configuration was changed.
 
-For normal user-operated builds, install the missing Ubuntu package if needed:
+**Buildx 0.30.1 is now installed permanently on WSL2 Ubuntu.** The test and live-run
+results below still describe the original temporary-plugin validation; those
+checks have not been rerun with the permanent installation. Check installed
+versions with:
 
 ```bash
-# User action only; this system installation was not performed during the milestone.
-sudo apt install docker-buildx
 docker compose version
 sudo docker version
 sudo docker buildx version
 ```
 
-`apt-cache policy` confirmed `docker-buildx` is available for this Ubuntu
-installation. Use `sudo docker ...` when required rather than weakening socket
+Use `sudo docker ...` when required rather than weakening socket
 permissions. Docker daemon access is privileged even when containers run as
 non-root. If the image is already built locally, running it does not need Buildx;
 future image builds do.
